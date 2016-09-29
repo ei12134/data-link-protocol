@@ -14,6 +14,7 @@ extern char set[];
 extern char ua[];
 extern char disc[];
 
+void answer_alarm();
 void build_header(char *msg, char control_field);
 char compute_bcc(char *msg, int length);
 
@@ -22,7 +23,7 @@ char *packet_content(const char *packet, const int size);
 
 int llread(int fd, char *buffer);
 void llwrite(int fd, char *buffer, int length);
-int llopen(char *serial_port, char timeout);
+int llopen(char *serial_port, char timeout, int mode);
 int llclose(int fd);
 
 #endif // SERIAL_PORT_H_

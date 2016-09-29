@@ -11,22 +11,23 @@
 
 int alarm_flag = TRUE;
 
-// set alarm_flag
-void answer_alarm() { alarm_flag = TRUE; }
+void answer_alarm()
+{
+	alarm_flag = TRUE;
+}
 
-int transmitter(char *serial_port) {
+int transmitter(char *serial_port)
+{
+	// set a SIGALARM signal handler
+	(void) signal(SIGALRM, answer_alarm);
 
-  // set a SIGALARM signal handler
-  (void)signal(SIGALRM, answer_alarm);
+	// initialize serial port session
+	int fd = llopen(serial_port, 30, TRANSMITTER);
 
-  // initialize serial port session
-  int fd = llopen(serial_port, 30);
+	// send SET
 
-  // send stuff
+	// end serial port session
+	llclose(fd);
 
-
-  // End serial port session
-  llclose(fd);
-
-  return 0;
+	return 0;
 }
