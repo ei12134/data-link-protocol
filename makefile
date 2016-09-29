@@ -1,7 +1,7 @@
 CC = gcc
 PROG = netlink
 CFLAGS = -Wall
-SRCS = *.c layers/application/*.c layers/link/*.c
+SRCS = *.c layers/application/*.c layers/link/*.c utils/*.c
 BIN_DIR = bin
 
 all: bin netlink

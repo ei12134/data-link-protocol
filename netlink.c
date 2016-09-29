@@ -12,8 +12,8 @@ int mode = RECEIVER;
 
 void usage(char **argv) {
   printf("Usage: %s [OPTION] <serial port>\n", argv[0]);
-  printf("\n Program options:\n");
-  printf("  -t\t\ttransmit data over the serial port\n");
+  printf("\nProgram mode:\n");
+  printf("  -t\t\t\ttransmit data over the serial port\n");
 }
 
 int parse_serial_port_arg(int index, char **argv) {
@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
 
   // Parse arguments
   int i = -1;
-  if ((i = parse_args(argc, argv)) != 0) {
+  if ((i = parse_args(argc, argv)) < 0) {
     usage(argv);
     exit(EXIT_FAILURE);
   }

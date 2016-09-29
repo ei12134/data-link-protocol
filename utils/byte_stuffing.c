@@ -2,7 +2,8 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-#include "serial_port.h"
+
+#include "../netlink.h"
 #include "byte_stuffing.h"
 
 // TODO: substituir por constantes dos outros ficheiros.

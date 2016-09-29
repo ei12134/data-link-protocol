@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "serial_port.h"
+#include "../../netlink.h"
 #include "../../utils/byte_stuffing.h"
 
 struct termios oldtio;
