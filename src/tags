@@ -1,0 +1,115 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+BADFRAME_CODE	data_link_io.h	/^    BADFRAME_CODE = -3$/;"	e	enum:return_code_enum
+BAUDRATE	serial_port.c	15;"	d	file:
+BUFSIZE	netlink.c	13;"	d	file:
+CC	makefile	/^CC = gcc$/;"	m
+CFLAGS	makefile	/^CFLAGS = -Wall -std=c99$/;"	m
+CONNECTION	data_link_test.c	/^struct Connection CONNECTION = {$/;"	v	typeref:struct:Connection
+Connection	data_link.h	/^struct Connection {$/;"	s
+DATA_LINK_H_	data_link.h	2;"	d
+DEVICE	data_link_test.c	11;"	d	file:
+DISC	data_link_io.h	25;"	d
+ERROR_CODE	data_link_io.h	/^    ERROR_CODE = -1,$/;"	e	enum:return_code_enum
+FALSE	data_link.c	11;"	d	file:
+FALSE	netlink.c	10;"	d	file:
+FRAME	data_link_io.c	/^struct Frame FRAME(const byte control) {$/;"	f
+FRAMES_H_	data_link_io.h	2;"	d
+Frame	data_link_io.h	/^struct Frame {$/;"	s
+LL_MAX_FRAME_SZ	data_link.h	5;"	d
+LL_MAX_PAYLOAD	data_link.h	10;"	d
+MAX_FD	packets.c	8;"	d	file:
+NUM_FRAMES_PER_CALL	packets.c	10;"	d	file:
+PACKET_SIZE	packets.c	9;"	d	file:
+PROG	makefile	/^PROG = netlink serial_port_test writenoncanonical noncanonical$/;"	m
+Return_e	data_link_io.h	/^} Return_e;$/;"	t	typeref:enum:return_code_enum
+SET	data_link_io.h	24;"	d
+SUCCESS_CODE	data_link_io.h	/^    SUCCESS_CODE = 0,$/;"	e	enum:return_code_enum
+TIMEOUT_CODE	data_link_io.h	/^    TIMEOUT_CODE = -2,$/;"	e	enum:return_code_enum
+TRANSMITTER	data_link_test.c	/^int TRANSMITTER = 0;$/;"	v
+TRANSMITTER	netlink.c	/^int TRANSMITTER = FALSE;$/;"	v
+TRANSMITTER	packets.c	/^int TRANSMITTER;$/;"	v
+TRUE	data_link.c	10;"	d	file:
+TRUE	netlink.c	9;"	d	file:
+UA	data_link_io.h	26;"	d
+_POSIX_SOURCE	serial_port.c	16;"	d	file:
+address	data_link_io.h	/^    byte address;$/;"	m	struct:Frame
+are_frames_equal	data_link_test.c	/^are_frames_equal(struct Frame f1,struct Frame f2)$/;"	f
+baudrate	data_link.h	/^    unsigned baudrate;$/;"	m	struct:Connection
+byte	serial_port.c	/^typedef unsigned char byte;$/;"	t	file:
+close_wait_time	data_link.h	/^    unsigned close_wait_time;$/;"	m	struct:Connection
+control	data_link_io.h	/^    byte control;$/;"	m	struct:Frame
+copy_and_stuff_bytes	data_link_io.c	/^copy_and_stuff_bytes($/;"	f	file:
+data	data_link_io.h	/^    byte *data;$/;"	m	struct:Frame
+data_control_byte	data_link.c	/^byte data_control_byte(unsigned long frame_number) {$/;"	f
+data_reply_byte	data_link.c	/^byte data_reply_byte(unsigned long frame_number,int accepted) {$/;"	f
+disconnect	data_link.c	/^int disconnect(struct Connection* conn)$/;"	f
+f_dump_frame_buffer	data_link_io.c	/^void f_dump_frame_buffer(const char *filename)$/;"	f
+f_print_frame	data_link_io.c	/^void f_print_frame(const struct Frame frame)$/;"	f
+f_receive_frame	data_link_io.c	/^f_receive_frame(const int fd,struct Frame* frame,const int timeout_ds)$/;"	f
+f_send_acknowledged_frame	data_link_io.c	/^f_send_acknowledged_frame($/;"	f
+f_send_frame	data_link_io.c	/^f_send_frame(const int fd,const struct Frame frame)$/;"	f
+fd	data_link.h	/^    int fd;$/;"	m	struct:Connection
+frame_number	data_link.h	/^    unsigned long frame_number;$/;"	m	struct:Connection
+g_buffer	data_link_io.c	/^static byte g_buffer[LL_MAX_FRAME_SZ]; \/** Local array for frame building. *\/$/;"	v	file:
+g_connections	packets.c	/^struct Connection g_connections[MAX_FD];$/;"	v	typeref:struct:Connection
+g_data_bcc_error_counter	data_link_io.c	/^static long g_data_bcc_error_counter = 0;$/;"	v	file:
+g_header_bcc_error_counter	data_link_io.c	/^static long g_header_bcc_error_counter = 0;$/;"	v	file:
+g_last_byte	serial_port.c	/^byte g_last_byte = 0;$/;"	v
+g_oldtio	serial_port.c	/^struct termios g_oldtio;$/;"	v	typeref:struct:termios
+g_previous_last_byte	serial_port.c	/^byte g_previous_last_byte = 0;$/;"	v
+g_rec_frame_counter	data_link_io.c	/^static long g_rec_frame_counter = 0;$/;"	v	file:
+g_sent_frame_counter	data_link_io.c	/^static long g_sent_frame_counter = 0;$/;"	v	file:
+g_timeout_alarm	data_link_io.c	/^volatile int g_timeout_alarm = 0;$/;"	v
+g_use_limited_rejected_retries	data_link.c	/^static long g_use_limited_rejected_retries = 0; \/\/ true or false$/;"	v	file:
+handle_disconnect	data_link.c	/^static int handle_disconnect(struct Connection* conn)$/;"	f	file:
+is_active	data_link.h	/^    int is_active;$/;"	m	struct:Connection
+is_transmitter	data_link.h	/^    int is_transmitter;$/;"	m	struct:Connection
+llclose	packets.c	/^int llclose(int fd)$/;"	f
+llopen	packets.c	/^int llopen(char *port,int transmitter) $/;"	f
+llread	packets.c	/^int llread(int fd,char *buffer,int buff_remaining)$/;"	f
+llwrite	packets.c	/^int llwrite(int fd,char *buffer,int length)$/;"	f
+main	data_link_test.c	/^int main(int argc,char *argv[])$/;"	f
+main	netlink.c	/^int main(int argc, char **argv)$/;"	f
+max_buffer_size	data_link.h	/^    size_t max_buffer_size;$/;"	m	struct:Connection
+max_data_size	data_link_io.h	/^    size_t max_data_size;$/;"	m	struct:Frame
+micro_timeout_ds	data_link.h	/^    unsigned micro_timeout_ds;$/;"	m	struct:Connection
+num_retransmissions	data_link.h	/^    unsigned num_retransmissions;$/;"	m	struct:Connection
+packet_size	data_link.h	/^    size_t packet_size;$/;"	m	struct:Connection
+parse_args	data_link_test.c	/^int parse_args(int argc, char **argv)$/;"	f
+parse_args	netlink.c	/^int parse_args(int argc, char **argv)$/;"	f
+parse_frame_from_array	data_link_io.c	/^parse_frame_from_array(struct Frame* frame,byte *a)$/;"	f	file:
+parse_serial_port_arg	data_link_test.c	/^int parse_serial_port_arg(int index, char **argv)$/;"	f
+parse_serial_port_arg	netlink.c	/^int parse_serial_port_arg(int index, char **argv)$/;"	f
+port	data_link.h	/^    char port[20];$/;"	m	struct:Connection
+print_help	data_link_test.c	/^void print_help(char **argv)$/;"	f
+print_help	netlink.c	/^void print_help(char **argv)$/;"	f
+print_speed	packets.c	/^void print_speed(time_t t0,size_t num_bytes)$/;"	f
+receiver_listen	data_link.c	/^int receiver_listen(struct Connection* conn)$/;"	f
+receiver_read	data_link.c	/^int receiver_read(struct Connection* conn,byte *begin,size_t max_data_size,$/;"	f
+return_code_enum	data_link_io.h	/^typedef enum return_code_enum {$/;"	g
+send_message	data_link_test.c	/^int send_message(struct Connection* conn,byte* s)$/;"	f
+serial_port_close	serial_port.c	/^int serial_port_close(int fd,int close_wait_time)$/;"	f
+serial_port_last_byte	serial_port.c	/^byte serial_port_last_byte() { return g_last_byte; }$/;"	f
+serial_port_open	serial_port.c	/^int serial_port_open(const char *dev_name,const int micro_timeout)$/;"	f
+serial_port_previous_last_byte	serial_port.c	/^byte serial_port_previous_last_byte() { return g_previous_last_byte; }$/;"	f
+serial_port_read	serial_port.c	/^int serial_port_read(int fd,byte *data,byte delim,int maxc)$/;"	f
+serial_port_write	serial_port.c	/^int serial_port_write(int fd,byte *data,int len)$/;"	f
+set_timeout_alarm	data_link_io.c	/^void set_timeout_alarm() { g_timeout_alarm = 1; }$/;"	f
+size	data_link_io.h	/^    size_t size;$/;"	m	struct:Frame
+test_1	data_link_test.c	/^int test_1(struct Connection* conn)$/;"	f
+test_2	data_link_test.c	/^int test_2(struct Connection* conn)$/;"	f
+test_3	data_link_test.c	/^int test_3(struct Connection* conn)$/;"	f
+test_4	data_link_test.c	/^int test_4(struct Connection *conn)$/;"	f
+test_5	data_link_test.c	/^int test_5(struct Connection* conn) $/;"	f
+test_6	data_link_test.c	/^int test_6(struct Connection* conn) $/;"	f
+test_7	data_link_test.c	/^int test_7(struct Connection* conn)$/;"	f
+test_single_message	data_link_test.c	/^int test_single_message(struct Connection *conn,byte* data)$/;"	f
+timeout_s	data_link.h	/^    unsigned timeout_s;$/;"	m	struct:Connection
+transmitter_connect	data_link.c	/^int transmitter_connect(struct Connection* conn)$/;"	f
+transmitter_write	data_link.c	/^int transmitter_write(struct Connection* conn,byte* data,size_t size)$/;"	f
+wait_for_disconnect	data_link.c	/^int wait_for_disconnect(struct Connection* conn,int timeout)$/;"	f
