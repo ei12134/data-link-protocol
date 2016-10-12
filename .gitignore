@@ -1,1 +1,8 @@
 bin
+**/*.o
+**/*.swp
+**/*.swo
+**/netlink
+**/serial_port_test
+**/data_link_test
+**/tags
