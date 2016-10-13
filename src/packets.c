@@ -23,8 +23,7 @@ int llopen(char *port,int transmitter)
     conn.num_retransmissions = 3;
     conn.close_wait_time = 1;
 
-    conn.is_transmitter = transmitter;
-    if (transmitter) {
+    if ((conn.is_transmitter = transmitter)) {
         if (transmitter_connect(&conn) < 0) {
             return -1;
         }
@@ -38,11 +37,11 @@ int llopen(char *port,int transmitter)
     return conn.fd;
 }
 
-void print_speed(time_t t0,size_t num_bytes)
+void print_speed(time_t t0,size_t num_bytes,unsigned long counter)
 {
     double dt = difftime(time(NULL),t0);
     double speed = ((double)(num_bytes*8))/dt;
-    fprintf(stderr,"Transfer speed: %lf bps\n",speed);
+    fprintf(stderr,"Link layer transmission %ld: %lf bit per sec.\n",counter,speed);
 }
 
 // TODO: return values
@@ -50,18 +49,25 @@ int llwrite(int fd,char *buffer,int length)
 {
     struct Connection *conn = &g_connections[fd];
 
+    unsigned long counter = 0;
+
     byte* p = (byte*)buffer;
     while (length > 0) {
         time_t t = time(NULL);
 
-        size_t num_bytes = length % conn->packet_size;
+
+	size_t remainder = length % conn->packet_size;
+	size_t num_bytes = remainder == 0 ? conn->packet_size : remainder;
+	//unsigned long num_bytes = ((length-1) % conn->packet_size) + 1;
+
         if (transmitter_write(conn,p,num_bytes) < 0) {
             return -1;
         }
+	counter++;
         p += num_bytes;
         length -= num_bytes;
 
-        print_speed(t,num_bytes);
+        print_speed(t,num_bytes,counter);
     }
     return 0;
 }
@@ -69,6 +75,8 @@ int llwrite(int fd,char *buffer,int length)
 int llread(int fd,char *buffer,int buff_remaining)
 {
     struct Connection* conn = &g_connections[fd];
+
+    unsigned long counter = 0;
 
     byte* p = (byte*)buffer;
     while (conn->is_active && buff_remaining > 0) {
@@ -83,10 +91,11 @@ int llread(int fd,char *buffer,int buff_remaining)
         if (num_bytes > buff_remaining) {
             fprintf(stderr,"too many bytes written... %d\n",__LINE__);
         }
+	counter++;
         p += num_bytes;
         buff_remaining -= num_bytes;
 
-        print_speed(t,num_bytes);
+        print_speed(t,num_bytes,counter);
     }
     return p - (byte*)buffer;
 }

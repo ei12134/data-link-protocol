@@ -75,24 +75,30 @@ int test1(int argc,char **argv)
 
     byte s[BUFSIZE];
     if (TRANSMITTER) {
-        byte s[BUFSIZE];
-        sprintf((char*)s,"Um pequeno passo para o homem...");
-        int len = strlen((char*)s);
-        if (serial_port_write(fd,s,len+1) < 0) {
+	char* test_message = "Um pequeno passo para o homem...";
+
+        int len = strlen(test_message);
+        if (serial_port_write(fd,(byte*)test_message,len+1) < 0) {
             printf("line: %d\n",__LINE__);
             return 1;
         }
         printf("Message sent: %s\n",s);
 
+        byte s[BUFSIZE];
         for (int i=0; s[i] != '\0'; i++) {
             s[i] = 'x';
         }
-
         if (serial_port_read(fd,s,'\0',BUFSIZE) < 0) {
             printf("line: %d\n",__LINE__);
             return 1;
         }
         printf("Message received: %s\n",s);
+
+	if (strcmp(test_message,(byte*)s) != 0) {
+		printf("Test failed");
+		return -1;
+	}
+
     } else {
         if (serial_port_read(fd,s,'\0',BUFSIZE) < 0) {
             printf("line: %d\n",__LINE__);

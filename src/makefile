@@ -3,7 +3,7 @@ CFLAGS = -Wall -std=c99
 CFLAGS += -DSERIAL_PORT_DEBUG_MODE
 CFLAGS += -DDATA_LINK_DEBUG_MODE
 
-PROG = netlink serial_port_test writenoncanonical noncanonical
+PROG = netlink serial_port_test writenoncanonical noncanonical writecanonical
 
 all: $(PROG)
 
@@ -30,5 +30,10 @@ data_link_io.o data_link.o serial_port.o data_link_test.io packets.o: byte.h
 data_link_io.o data_link.o data_link_test.o packets.o: data_link.h
 
 packets.o netlink.o: packets.h
+
+writecanonical: ../example_code/writecanonical.c
+writenoncanonical: ../example_code/writenoncanonical.c
+noncanonical: ../example_code/noncanonical.c
+canonical: ../example_code/canonical.c
 
 .PHONY: clean

@@ -61,16 +61,15 @@ int main(int argc, char **argv)
 	}
 
 	char *port = argv[i];
-
 	int fd;
 	if ((fd = llopen(port, TRANSMITTER)) < 0) {
 		return 1;
 	}
 	char *buffer = malloc(sizeof(char) * BUFSIZE);
-	int c;
 
 	if (TRANSMITTER) {
-		fprintf(stderr, "Transmitting...\n");
+		fprintf(stderr, "netlink: transmitting...\n");
+		int c;
 		do {
 			int i = 0;
 			while (i < BUFSIZE && (c = getc(stdin)) != EOF) {
@@ -84,7 +83,7 @@ int main(int argc, char **argv)
 		} while (c != EOF);
 		return llclose(fd);
 	} else {
-		fprintf(stderr, "Receiving...\n");
+		fprintf(stderr, "netlink: receiving...\n");
 		int num_bytes;
 		do {
 			if ((num_bytes = llread(fd, buffer, BUFSIZE)) < 0) {
@@ -92,17 +91,18 @@ int main(int argc, char **argv)
 				llclose(fd);
 				return 1;
 			}
+			FILE* out = fopen("imagem.gif", "wb");
+			fwrite(buffer, sizeof(char), BUFSIZE, out);
+			fclose(out);
 			/*
 			 * OUTPUT TO STDOUT!
 			 */
-			//
-			FILE* out = fopen("imagem.gif", "wb");
-			fwrite(buffer, sizeof(char), BUFSIZE, out);
-			//fprintf(out,"%s",buffer);
-			fclose(out);
+			printf("%.*s", num_bytes, buffer);
+
 			free(buffer);
-			printf("%.*s", num_bytes, buffer);
-			printf("%.*s", num_bytes, buffer);
+
+			printf("debug: num_bytes=%d\n",num_bytes);
+
 		} while (num_bytes > 0);
 		return 0;
 	}

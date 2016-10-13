@@ -195,7 +195,7 @@ int receiver_listen(struct Connection* conn)
             f_send_frame(conn->fd,UA);
             conn->is_active = 1;
             #ifdef DATA_LINK_DEBUG_MODE
-            fprintf(stderr,"Connection established.\n");
+            fprintf(stderr,"listen(): connection established.\n");
             #endif
             return 0;
         }
@@ -261,7 +261,7 @@ int receiver_read(struct Connection* conn,byte *begin,size_t max_data_size,
             if (f_send_frame(conn->fd,FRAME(control)) != SUCCESS_CODE) {
                 break;
             }
-            ++conn->frame_number;
+            conn->frame_number++;
         }
     }
     return p - begin;
