@@ -10,8 +10,9 @@
 #define FALSE 0
 
 int TRANSMITTER = FALSE;
-#define BUFSIZE (8*1024*1024)
-#define OUTPUT_TO_STDOUT 1
+char* file_content;
+long length;
+#define BUFSIZE (8*1024)
 
 // Print how the arguments must be
 void print_help(char **argv)
@@ -20,6 +21,28 @@ void print_help(char **argv)
 	fprintf(stderr, "\n Program options:\n");
 	fprintf(stderr, "  -t         transmit data over the serial port\n");
 }
+
+char* readFileBytes(const char *name)
+{
+	FILE *file = fopen(name, "r");
+	if (file != NULL)
+	{
+		fseek(file, 0L, SEEK_END);
+		length = ftell(file);
+		char *buffer = malloc(length);
+		if(buffer != NULL)
+		{			
+			fseek(file, 0, SEEK_SET);
+			fread(buffer, 1, length, file);
+			//printf("O conteúdo do ficheiro é: %s\n", buffer);
+			fclose(file);
+			return buffer;
+		}
+	}
+	printf("File is NULL.\n");
+	return 0;
+}
+
 
 // Verifies serial port argument
 int parse_serial_port_arg(int index, char **argv)
@@ -48,12 +71,24 @@ int parse_args(int argc, char **argv)
 			TRANSMITTER = TRUE;
 
 		return parse_serial_port_arg(2, argv);
-	} else
-		return -1;
+	} 
+	
+	if(argc == 4)
+	{
+		if ((strcmp("-t", argv[1]) != 0))
+			return -2;
+		else
+			TRANSMITTER = TRUE;
+		
+		file_content = readFileBytes(argv[3]);	
+		return parse_serial_port_arg(2, argv);
+	}
+	else return -1;	
 }
 
 int main(int argc, char **argv)
 {
+	
 	// Verifies arguments
 	int i = -1;
 	if ((i = parse_args(argc, argv)) < 0) {
@@ -61,6 +96,8 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+
+	//printf("File Content: %s\n", file_content);
 	char *port = argv[i];
 	int fd;
 	if ((fd = llopen(port, TRANSMITTER)) < 0) {
@@ -70,43 +107,49 @@ int main(int argc, char **argv)
 
 	if (TRANSMITTER) {
 		fprintf(stderr, "netlink: transmitting...\n");
-		int c;
+		if(llwrite(fd,file_content, length) <0)
+		{
+			fprintf(stderr, "netlink: closing prematurely\n");
+				llclose(fd);
+				return 1;
+		}
+		/*int c;
 		do {
 			int i = 0;
-			while (i < BUFSIZE && (c = getc(stdin)) != EOF) {
+			while (i < BUFSIZE && (c = getc(file_content)) != EOF) {
 				buffer[i++] = c;
 			}
+
 			if (llwrite(fd, buffer, i) < 0) {
 				fprintf(stderr, "netlink: closing prematurely\n");
 				llclose(fd);
 				return 1;
 			}
-		} while (c != EOF);
+		} while (c != EOF);*/
 		return llclose(fd);
 	} else {
 		fprintf(stderr, "netlink: receiving...\n");
-
-		FILE* outfile = fopen("imagem.gif", "w");
 		int num_bytes;
-		int ret;
 		do {
-		    if ((num_bytes = llread(fd, buffer, BUFSIZE)) < 0) {
-                        fprintf(stderr, "netlink: closing prematurely\n");
-		        ret = -1;
-                        llclose(fd);
-		    }
-		    if (OUTPUT_TO_STDOUT) { printf("%.*s", num_bytes, buffer); }
-		    if ((ret = fwrite(buffer,sizeof(char),num_bytes,outfile)) < 0) {
-			fprintf(stderr,"netlink: file write error\n");
-                        break;
-		    }
+			if ((num_bytes = llread(fd, buffer, BUFSIZE)) < 0) {
+				fprintf(stderr, "netlink: closing prematurely\n");
+				llclose(fd);
+				return 1;
+			}
+//			FILE* out = fopen("imagem.gif", "wb");
+			FILE* out = fopen("recebido.txt", "wb");
+			fwrite(buffer, sizeof(char), BUFSIZE, out);
+			fclose(out);
+			/*
+			 * OUTPUT TO STDOUT!
+			 */
+			printf("%.*s", num_bytes, buffer);
+
+			free(buffer);
+
+			printf("debug: num_bytes=%d\n",num_bytes);
+
 		} while (num_bytes > 0);
-
-                printf("debug: num_bytes=%d\n",num_bytes);
-
-		if (fclose(outfile) < 1) { ret = -1; }
-		free(buffer);
-
-		return ret;
+		return 0;
 	}
 }
