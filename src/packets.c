@@ -6,8 +6,12 @@
 #include "packets.h"
 
 #define MAX_FD 10
-#define PACKET_SIZE LL_MAX_FRAME_SZ
+#define PACKET_SIZE LL_MAX_PAYLOAD_UNSTUFFED
 #define NUM_FRAMES_PER_CALL 10
+#define TIMEOUT_S 5
+#define MICRO_TIMEOUT_DS 5
+#define NUM_RETRANSMISSIONS 3
+#define CLOSE_WAIT_TIME 2
 
 int TRANSMITTER;
 
@@ -18,10 +22,10 @@ int llopen(char *port,int transmitter)
     struct Connection conn;
     strcpy(conn.port,port);
     conn.packet_size = PACKET_SIZE;
-    conn.micro_timeout_ds = 5;
-    conn.timeout_s = 1;
-    conn.num_retransmissions = 3;
-    conn.close_wait_time = 1;
+    conn.micro_timeout_ds = MICRO_TIMEOUT_DS;
+    conn.timeout_s = TIMEOUT_S;
+    conn.num_retransmissions = NUM_RETRANSMISSIONS;
+    conn.close_wait_time = CLOSE_WAIT_TIME;
 
     if ((conn.is_transmitter = transmitter)) {
         if (transmitter_connect(&conn) < 0) {
@@ -37,15 +41,18 @@ int llopen(char *port,int transmitter)
     return conn.fd;
 }
 
-void print_speed(time_t t0,size_t num_bytes,unsigned long counter)
+void print_status(time_t t0,size_t num_bytes,unsigned long counter)
 {
     double dt = difftime(time(NULL),t0);
     double speed = ((double)(num_bytes*8))/dt;
-    fprintf(stderr,"Link layer transmission %ld: %lf bit per sec.\n",counter,speed);
+    fprintf(stderr,"----------------------\n");
+    fprintf(stderr,"Link layer transmission %ld: %lf bit per sec; %ldB of data\n",
+		    counter,speed,num_bytes);
+    fprintf(stderr,"----------------------\n");
 }
 
 // TODO: return values
-int llwrite(int fd,char *buffer,int length)
+int llwrite(const int fd,const char *buffer,int length)
 {
     struct Connection *conn = &g_connections[fd];
 
@@ -67,12 +74,12 @@ int llwrite(int fd,char *buffer,int length)
         p += num_bytes;
         length -= num_bytes;
 
-        print_speed(t,num_bytes,counter);
+        print_status(t,num_bytes,counter);
     }
     return 0;
 }
 
-int llread(int fd,char *buffer,int buff_remaining)
+int llread(const int fd,const char *buffer,int buff_remaining)
 {
     struct Connection* conn = &g_connections[fd];
 
@@ -95,7 +102,7 @@ int llread(int fd,char *buffer,int buff_remaining)
         p += num_bytes;
         buff_remaining -= num_bytes;
 
-        print_speed(t,num_bytes,counter);
+        print_status(t,num_bytes,counter);
     }
     return p - (byte*)buffer;
 }

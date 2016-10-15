@@ -13,7 +13,7 @@
 static long g_use_limited_rejected_retries = 0; // true or false
 
 byte data_reply_byte(unsigned long frame_number,int accepted) {
-    return (accepted ? C_RR : C_REJ) | ((frame_number%2==0) ? 0 : (1 << 5));
+    return (accepted ? C_RR : C_REJ) | ((accepted) ? 0 : (1 << 5)); 
 }
 
 byte data_control_byte(unsigned long frame_number) {
@@ -51,7 +51,7 @@ static int handle_disconnect(struct Connection* conn)
 int transmitter_connect(struct Connection* conn)
 {
     conn->is_active = 0;
-    conn->max_buffer_size = LL_MAX_PAYLOAD;
+    conn->max_buffer_size = LL_MAX_PAYLOAD_STUFFED;
     conn->frame_number = 0;
 
     if ((conn->fd = serial_port_open(conn->port,conn->micro_timeout_ds)) < 0) {
@@ -90,7 +90,7 @@ int transmitter_connect(struct Connection* conn)
 // TODO
 int transmitter_write(struct Connection* conn,byte* data,size_t size)
 {
-    struct Frame out = {
+    struct Frame out_frame = {
         .address = A,
         .control = data_control_byte(conn->frame_number),
         .size = size,
@@ -103,24 +103,26 @@ int transmitter_write(struct Connection* conn,byte* data,size_t size)
     /* Send data frame and receive confirmation.  */
     int ntries = conn->num_retransmissions;
     while (1) {
-        struct Frame reply;
+        struct Frame reply_frame;
         if ((ntries = f_send_acknowledged_frame(
-                        conn->fd,ntries,conn->timeout_s,
-                        out,&reply)) < 0) {
+                        conn->fd,
+			ntries,
+			conn->timeout_s,
+                        out_frame,
+			&reply_frame)) < 0) {
             return -1;
         }
-
-        if (reply.control == rej_rep) {
+        if (reply_frame.control == rej_rep) {
             if (g_use_limited_rejected_retries) {
                 --ntries;
             }
         }
-        if (reply.control == success_rep) {
+        if (reply_frame.control == success_rep) {
             break;
         }
     }
 
-    ++conn->frame_number;
+    conn->frame_number++;
     return 0;
 }
 
@@ -175,7 +177,7 @@ int disconnect(struct Connection* conn)
 // TODO
 int receiver_listen(struct Connection* conn)
 {
-    conn->max_buffer_size = LL_MAX_PAYLOAD;
+    conn->max_buffer_size = LL_MAX_PAYLOAD_STUFFED;
     conn->frame_number = 0;
 
     if ((conn->fd = serial_port_open(conn->port,conn->micro_timeout_ds)) < 0) {
@@ -218,6 +220,9 @@ int receiver_read(struct Connection* conn,byte *begin,size_t max_data_size,
         if (ret == ERROR_CODE) {
             return -1;
         }
+	else if (ret == TIMEOUT_CODE) {
+            break;
+	}
         else if (ret == BADFRAME_CODE) {
             #ifdef DATA_LINK_DEBUG_MODE
             fprintf(stderr,"receiver_read(): parsing: bad frame.\n");
@@ -255,6 +260,7 @@ int receiver_read(struct Connection* conn,byte *begin,size_t max_data_size,
                     (int)in.size,p);
             #endif
 
+	    num_frames++;
             p += in.size;
 
             byte control = data_reply_byte(conn->frame_number,TRUE);

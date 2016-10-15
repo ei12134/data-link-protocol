@@ -2,6 +2,7 @@
 #define A       0x03    /* Address field */
 
 /* Control field: */
+// TODO: numeros mudaram
 #define C_SET   0x07    /* Set up */
 #define C_DISC  0x0B    /* Disconnect */
 #define C_UA    0x03    /* Unnumbered acknowledgment */

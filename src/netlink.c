@@ -10,7 +10,8 @@
 #define FALSE 0
 
 int TRANSMITTER = FALSE;
-#define BUFSIZE (8*1024)
+#define BUFSIZE (8*1024*1024)
+#define OUTPUT_TO_STDOUT 1
 
 // Print how the arguments must be
 void print_help(char **argv)
@@ -84,26 +85,28 @@ int main(int argc, char **argv)
 		return llclose(fd);
 	} else {
 		fprintf(stderr, "netlink: receiving...\n");
+
+		FILE* outfile = fopen("imagem.gif", "w");
 		int num_bytes;
+		int ret;
 		do {
-			if ((num_bytes = llread(fd, buffer, BUFSIZE)) < 0) {
-				fprintf(stderr, "netlink: closing prematurely\n");
-				llclose(fd);
-				return 1;
-			}
-			FILE* out = fopen("imagem.gif", "wb");
-			fwrite(buffer, sizeof(char), BUFSIZE, out);
-			fclose(out);
-			/*
-			 * OUTPUT TO STDOUT!
-			 */
-			printf("%.*s", num_bytes, buffer);
-
-			free(buffer);
-
-			printf("debug: num_bytes=%d\n",num_bytes);
-
+		    if ((num_bytes = llread(fd, buffer, BUFSIZE)) < 0) {
+                        fprintf(stderr, "netlink: closing prematurely\n");
+		        ret = -1;
+                        llclose(fd);
+		    }
+		    if (OUTPUT_TO_STDOUT) { printf("%.*s", num_bytes, buffer); }
+		    if ((ret = fwrite(buffer,sizeof(char),num_bytes,outfile)) < 0) {
+			fprintf(stderr,"netlink: file write error\n");
+                        break;
+		    }
 		} while (num_bytes > 0);
-		return 0;
+
+                printf("debug: num_bytes=%d\n",num_bytes);
+
+		if (fclose(outfile) < 1) { ret = -1; }
+		free(buffer);
+
+		return ret;
 	}
 }

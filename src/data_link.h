@@ -7,7 +7,8 @@
 
 // - 2 flags, 3-byte header, 1 data bcc
 // '/2' because of worst case scenario byte stuffing
-#define LL_MAX_PAYLOAD ((LL_MAX_FRAME_SZ-2-3-1)/2)
+#define LL_MAX_PAYLOAD_STUFFED ((LL_MAX_FRAME_SZ-2-3-1)/2)
+#define LL_MAX_PAYLOAD_UNSTUFFED (LL_MAX_PAYLOAD_STUFFED/2)
 
 #include <stddef.h>
 #include "byte.h"

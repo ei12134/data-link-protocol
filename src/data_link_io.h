@@ -31,7 +31,7 @@ Return_e f_receive_frame(const int fd,struct Frame* frame,const int timeout_ds);
 int f_send_acknowledged_frame(
         const int fd,
         const unsigned num_retransmissions,
-        const int timeout_ds,
+        const int timeout_s,
         struct Frame out,
         struct Frame* in);
 void f_print_frame(const struct Frame frame);

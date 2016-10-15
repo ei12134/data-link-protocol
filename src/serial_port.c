@@ -55,9 +55,10 @@ int serial_port_open(const char *dev_name,const int micro_timeout)
     }
     bzero(&newtio, sizeof(newtio)); /* clear struct for new port settings */
     newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
-    newtio.c_iflag = IGNPAR | ICRNL;
-    //newtio.c_iflag = IGNPAR;
+    //newtio.c_iflag = IGNPAR | ICRNL;
+    newtio.c_iflag = IGNPAR;
     newtio.c_oflag = OPOST;
+    newtio.c_oflag &= ~OCRNL;
 
     /* set input mode (non-canonical, no echo,...) */
     //newtio.c_lflag &= ~(ICANON | ECHO);
@@ -107,14 +108,15 @@ int serial_port_write(int fd,byte *data,int len)
 
     int result = write(fd,data,len);
 
-    #ifdef SERIAL_PORT_DEBUG_MODE
-    fprintf(stderr,"serial_port_write(): write() -> %d\n",result);
-    #endif
-
     if (result < 0) {
         fprintf(stderr,"serial_port_write(): error %d, errno = %x\n",result,
                 errno);
+    #ifdef SERIAL_PORT_DEBUG_MODE
+    } else {
+        fprintf(stderr,"serial_port_write(): wrote %d bytes\n",result);
+    #endif
     }
+
     return result;
 }
 
@@ -138,32 +140,34 @@ int serial_port_read(int fd,byte *data,byte delim,int maxc)
     int nc = 0; // num chars read so far
     do {
         int ret = read(fd,&g_last_byte,1);
-        if (ret < 0) {
+        if (ret == 0) {
             #ifdef SERIAL_PORT_DEBUG_MODE
-            fprintf(stderr,"serial_port_read(): ret = %d, errno = %d\n",ret,errno);
-            #endif
-            if (errno == EINTR) { // interrupted, possibly by an alarm
-                break;
-            }
-            return ret;
-        }
-        else if (ret == 0) {
-            #ifdef SERIAL_PORT_DEBUG_MODE
-            fprintf(stderr,"serial_port_read(): timeout tick\n");
+            fprintf(stderr,"serial_port_read(): micro timeout tick\n");
             #endif
             break;
         }
-        #ifdef SERIAL_PORT_DEBUG_MODE
+	else if (ret < 0 && errno == EINTR) { // interrupted, possibly by an alarm
+            #ifdef SERIAL_PORT_DEBUG_MODE
+            fprintf(stderr,"serial_port_read(): received interrupt\n");
+            #endif
+	    return 0;
+        }
+	else if (ret < 0) {
+            #ifdef SERIAL_PORT_DEBUG_MODE
+            fprintf(stderr,"serial_port_read(): ret = %d, errno = %d\n",ret,errno);
+            #endif
+	}
+        #ifdef SERIAL_PORT_PRINT_ALL_CHARS
         fprintf(stderr,"< %x\n",g_last_byte);
         //fprintf(stderr,"c: %d/%c, nc: %d, ret: %d\n",c,c,nc,ret);
         #endif
 
         *p++ = g_last_byte;
-        ++nc;
+        nc++;
     } while (nc < maxc && g_last_byte != delim);
 
     #ifdef SERIAL_PORT_DEBUG_MODE
-    fprintf(stderr,"serial_port_read(): read (%d): %.*s\n",nc,nc,data);
+    //fprintf(stderr,"serial_port_read(): read (%d): %.*s\n",nc,nc,data);
     #endif
 
     return nc;

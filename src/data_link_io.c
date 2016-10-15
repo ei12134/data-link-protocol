@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <signal.h>
+#include <stdlib.h>
 
 #include "serial_port.h"
 #include "data_link.h"
@@ -52,17 +53,24 @@ void f_dump_frame_buffer(const char *filename)
     }
 }
 
+/* Reads array and builds a "struct Frame* frame*" from it
+ * - checks if its a supervision or data frame
+ * - checks bcc 
+ * - destuffs bytes
+ * - returns SUCCESS_CODE, ERROR_CODE, or BADFRAME_CODE (when bcc is wrong, or
+ *   data is too large)
+ */
 static Return_e
 parse_frame_from_array(struct Frame* frame,byte *a)
 {
     #ifdef DATA_LINK_DEBUG_MODE
+    fprintf(stderr,"  parse_frame_from_array(): entering function.\n");
     f_dump_frame_buffer("FRAME");
-    fprintf(stderr,"parse_frame_from_array(): entering function.\n");
     #endif
 
     if (*a++ != FLAG) {
         #ifdef DATA_LINK_DEBUG_MODE
-        fprintf(stderr,"parse_frame_from_array(): error: missing flag: \
+        fprintf(stderr,"  parse_frame_from_array(): error: missing flag: \
                 (line %d).\n",__LINE__);
         #endif
         return ERROR_CODE;
@@ -70,7 +78,7 @@ parse_frame_from_array(struct Frame* frame,byte *a)
     for (int i = 0; i <= 2; i++) { // the next fields should not have a FLAG
         if (a[i] == FLAG) {
             #ifdef DATA_LINK_DEBUG_MODE
-            fprintf(stderr,"parse_frame_from_array(): error: unexpected flag \
+            fprintf(stderr,"  parse_frame_from_array(): error: unexpected flag \
                     (line %d).\n",__LINE__);
             #endif
             return BADFRAME_CODE;
@@ -83,84 +91,92 @@ parse_frame_from_array(struct Frame* frame,byte *a)
     const byte header_bcc = *a++;
     if (header_bcc != (frame->address ^ frame->control)) {
         #ifdef DATA_LINK_DEBUG_MODE
-        fprintf(stderr,"parse_frame_from_array(): header bcc: %d.\n",__LINE__);
+        fprintf(stderr,"  parse_frame_from_array(): error: header bcc: %d.\n",__LINE__);
         #endif
         ++g_header_bcc_error_counter;
         return BADFRAME_CODE;
     }
     frame->size = 0;
 
-    if (a[0] == FLAG) {
+    /* Supervision frame */
+    if (*a == FLAG) {
         #ifdef DATA_LINK_DEBUG_MODE
-        fprintf(stderr,"parse_frame_from_array(): read a supervision frame.\n");
+        fprintf(stderr,"  parse_frame_from_array(): read a supervision frame.\n");
         #endif
         return SUCCESS_CODE;
     }
 
-    if (a[1] == FLAG) {
+    if (*(a+1) == FLAG) {
         #ifdef DATA_LINK_DEBUG_MODE
-        fprintf(stderr,"parse_frame_from_array(): error: only 1B remaining.\n");
+        fprintf(stderr,"  parse_frame_from_array(): error: only 1B remaining.\n");
         #endif
         return BADFRAME_CODE;
     }
 
-    byte bcc = 0;
+    /* Data frame */
+    byte data_bcc = 0;
     size_t num_bytes = 0;
     while (1) {
-        if (num_bytes > LL_MAX_PAYLOAD || frame->size > frame->max_data_size) {
+        if (num_bytes > LL_MAX_PAYLOAD_STUFFED) {
             #ifdef DATA_LINK_DEBUG_MODE
-            fprintf(stderr,"parse_frame_from_array(): %d.\n",__LINE__);
+            fprintf(stderr,"  parse_frame_from_array(): line %d.\n",__LINE__);
             #endif
             return BADFRAME_CODE;
         }
+	if (frame->size > frame->max_data_size) {
+            #ifdef DATA_LINK_DEBUG_MODE
+            fprintf(stderr,"  parse_frame_from_array(): line %d.\n",__LINE__);
+            #endif
+            return BADFRAME_CODE;
+	}
 
         /*
          * Stop loop condition.
          */
         if (a[num_bytes+1] == FLAG) {
-            if (a[num_bytes-1] == BS_ESC) {
-                #ifdef DATA_LINK_DEBUG_MODE
-                fprintf(stderr,"parse_frame_from_array(): %d.\n",__LINE__);
-                #endif
-                return BADFRAME_CODE;
-            }
-            if (a[num_bytes] != bcc) {
+            if (a[num_bytes] != data_bcc) {
                 ++g_data_bcc_error_counter;
                 #ifdef DATA_LINK_DEBUG_MODE
-                fprintf(stderr,"parse_frame_from_array(): data bcc: %d.\n",__LINE__);
+                fprintf(stderr,"  parse_frame_from_array(): data bcc: line %d.\n",__LINE__);
                 #endif
+		fprintf(stderr,"frame size %ld\n",frame->size);
+		fprintf(stderr,"data bcc = %x\n",data_bcc);
+		fprintf(stderr,"a[num_bytes] = %x\n",a[num_bytes]);
+		exit(1);
                 return BADFRAME_CODE;
             }
             #ifdef DATA_LINK_DEBUG_MODE
-            fprintf(stderr,"parse_frame_from_array(): successful read.\n");
+            fprintf(stderr,"  parse_frame_from_array(): successful read.\n");
             #endif
             return SUCCESS_CODE;
         }
 
         byte c;
         if (a[num_bytes] == BS_ESC) {
+            fprintf(stderr,"----\n");
             // remove byte stuffing
             ++num_bytes;
-            c = BS_OCT ^ a[num_bytes];
+            c = BS_OCT^a[num_bytes];
         } else {
             c = a[num_bytes];
         }
         ++num_bytes;
-        bcc ^= c;
+        data_bcc ^= c;
         frame->data[frame->size++] = c;
+	fprintf(stderr,"%x\n",c);
     }
 }
 
 static byte *
 copy_and_stuff_bytes(
         byte *dest,
-        const byte *data,
-        const size_t size,
-        byte *data_bcc)
+        const byte *src,
+        const size_t src_size,
+        byte *src_bcc)
 {
     int bcc = 0;
-    for (int i = 0; i < size; ++i) {
-        byte c = data[i];
+    for (int i = 0; i < src_size; ++i) {
+        byte c = src[i];
         bcc ^= c;
         if (c == FLAG || c == BS_ESC) {
             *dest++ = BS_ESC;
@@ -168,8 +184,11 @@ copy_and_stuff_bytes(
         } else {
             *dest++ = c;
         }
+	fprintf(stderr,"%2x\n",c);
     }
-    *data_bcc = bcc;
+    *src_bcc = bcc;
+    fprintf(stderr,"size %ld\n",src_size);
+    fprintf(stderr,"bcc %2x\n",bcc);
     return dest;
 }
 
@@ -183,7 +202,7 @@ Return_e
 f_send_frame(const int fd,const struct Frame frame)
 {
     #ifdef DATA_LINK_DEBUG_MODE
-    fprintf(stderr,"f_send_frame(): beginning frame writing (C=%x, %zu B)\n",
+    fprintf(stderr,"f_send_frame(): beginning frame writing (C=0x%2x, %zu bytes)\n",
             frame.control,frame.size);
     #endif
 
@@ -197,7 +216,7 @@ f_send_frame(const int fd,const struct Frame frame)
     *bp++ = frame.address ^ frame.control; // bcc
 
     // copy data
-    if (frame.size > LL_MAX_FRAME_SZ) {
+    if (frame.size > LL_MAX_PAYLOAD_UNSTUFFED) {
         #ifdef DATA_LINK_DEBUG_MODE
         fprintf(stderr,"f_send_frame(): tried to send too big a frame \
                 (%zu bytes)\n",frame.size);
@@ -208,6 +227,9 @@ f_send_frame(const int fd,const struct Frame frame)
         byte data_bcc;
         bp = copy_and_stuff_bytes(bp,frame.data,frame.size,&data_bcc);
         *bp++ = data_bcc;
+        #ifdef DATA_LINK_DEBUG_MODE
+	fprintf(stderr,"f_send_frame(): unstuffed data size %ld.\n",frame.size);
+        #endif
     }
 
     *bp++ = FLAG;
@@ -226,28 +248,33 @@ f_send_frame(const int fd,const struct Frame frame)
     return SUCCESS_CODE;
 }
 
+void start_alarm(int s)
+{
+    #ifdef DATA_LINK_DEBUG_MODE
+    fprintf(stderr,"Setting alarm: %d sec.\n",s);
+    #endif
+    signal(SIGALRM,set_timeout_alarm);  // TODO: put in init function
+    g_timeout_alarm = 0;
+    alarm(s);
+}
+
 /** 
  */
 Return_e
-f_receive_frame(const int fd,struct Frame* frame,const int timeout_ds)
+f_receive_frame(const int fd,struct Frame* frame,const int timeout_s)
 {
     #ifdef DATA_LINK_DEBUG_MODE
-    fprintf(stderr,"f_receive_frame(): beginning frame reception.\n");
+    fprintf(stderr,"  f_receive_frame(): beginning frame reception.\n");
     #endif
 
-    const int using_timeout = (timeout_ds > 0);
-    if (using_timeout) {
-        fprintf(stderr,"f_receive_frame(): setting timeout.\n");
-        signal(SIGALRM,set_timeout_alarm);  // TODO: put in init function
-        g_timeout_alarm = 0;
-        alarm(timeout_ds);
-    }
+    const int using_timeout = (timeout_s > 0);
 
+    if (using_timeout) { start_alarm(timeout_s); }
     while (1)
     {
         while (serial_port_last_byte() != FLAG) { // first flag
             #ifdef DATA_LINK_DEBUG_MODE
-            fprintf(stderr,"f_receive_frame(): looking for next flag.\n");
+            fprintf(stderr,"  f_receive_frame(): looking for next flag.\n");
             #endif
 
             if (serial_port_read(fd,g_buffer,FLAG,LL_MAX_FRAME_SZ) < 0) {
@@ -258,24 +285,25 @@ f_receive_frame(const int fd,struct Frame* frame,const int timeout_ds)
             }
 
             #ifdef DATA_LINK_DEBUG_MODE
-            fprintf(stderr,"f_receive_frame(): last byte=%x.\n",
+            fprintf(stderr,"  f_receive_frame(): last byte=%x.\n",
                     serial_port_last_byte());
             #endif
         }
         #ifdef DATA_LINK_DEBUG_MODE
-        fprintf(stderr,"f_receive_frame(): First FLAG detected.\n");
+        fprintf(stderr,"  f_receive_frame(): First FLAG detected.\n");
         #endif
         g_buffer[0] = FLAG;
 
         // skip initial flags and read
         while (1)
         {
+	    if (using_timeout) { start_alarm(timeout_s); }
             int ret = serial_port_read(fd,g_buffer+1,FLAG,LL_MAX_FRAME_SZ-1);
             if (using_timeout && g_timeout_alarm) {
                 return TIMEOUT_CODE;
             }
             if (ret < 0) {
-                fprintf(stderr,"f_receive_frame(): error.\n");
+                fprintf(stderr,"  f_receive_frame(): error.\n");
                 return -1;
             }
             if (ret > 1){ 
@@ -285,7 +313,7 @@ f_receive_frame(const int fd,struct Frame* frame,const int timeout_ds)
 
         if (serial_port_last_byte() == FLAG) { // final flag
             #ifdef DATA_LINK_DEBUG_MODE
-            fprintf(stderr,"f_receive_frame(): Last FLAG detected.\n");
+            fprintf(stderr,"  f_receive_frame(): Last FLAG detected.\n");
             #endif
             Return_e ret = parse_frame_from_array(frame,g_buffer);
             if (ret == SUCCESS_CODE) {
