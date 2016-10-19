@@ -13,31 +13,31 @@
 #include <stddef.h>
 #include "byte.h"
 
-struct Connection {
-    int fd;
-    unsigned long frame_number;
+struct connection {
+	int fd;
+	unsigned long frame_number;
 
-    /* Settings */
-    char port[20];
-    size_t max_buffer_size;
-    size_t packet_size;
-    unsigned num_retransmissions;
-    unsigned baudrate;
-    unsigned timeout_s;
-    unsigned micro_timeout_ds;
-    unsigned close_wait_time;
-    int is_transmitter;
-    int is_active;
+	/* Settings */
+	char port[20];
+	size_t max_buffer_size;
+	size_t packet_size;
+	unsigned num_retransmissions;
+	unsigned baudrate;
+	unsigned timeout_s;
+	unsigned micro_timeout_ds;
+	unsigned close_wait_time;
+	int is_transmitter;
+	int is_active;
 };
 
-int transmitter_connect(struct Connection* conn);
-int transmitter_write(struct Connection* conn,byte* data,size_t size);
+int transmitter_connect(struct connection* conn);
+int transmitter_write(struct connection* conn, byte* data, size_t size);
 
-int receiver_listen(struct Connection* conn);
-int receiver_read(struct Connection* conn,byte *data,size_t max_data_size,
-        const int num_frames);
+int receiver_listen(struct connection* conn);
+int receiver_read(struct connection* conn, byte *data, size_t max_data_size,
+		const int num_frames);
 
-int disconnect(struct Connection *conn);
-int wait_for_disconnect(struct Connection* conn,int timeout_s);
+int disconnect(struct connection *conn);
+int wait_for_disconnect(struct connection* conn, int timeout_s);
 
 #endif // DATA_LINK_H_

@@ -20,13 +20,13 @@ byte data_control_byte(unsigned long frame_number) {
     return (frame_number%2==0) ? 0 : (1 << 5);
 }
 
-static int handle_disconnect(struct Connection* conn)
+static int handle_disconnect(struct connection* conn)
 {
     int ret = 0;
 
     int ntries = conn->num_retransmissions;
     while (1) {
-        struct Frame reply;
+        struct frame reply;
         if ((ntries = f_send_acknowledged_frame(
                         conn->fd, ntries, conn->timeout_s,
                         DISC,&reply)) < 0) { ret = -1; break; }
@@ -48,7 +48,7 @@ static int handle_disconnect(struct Connection* conn)
 /** \brief Establish logical connection.
  *
  * Open serial port, send SET, receive UA. */
-int transmitter_connect(struct Connection* conn)
+int transmitter_connect(struct connection* conn)
 {
     conn->is_active = 0;
     conn->max_buffer_size = LL_MAX_PAYLOAD_STUFFED;
@@ -65,7 +65,7 @@ int transmitter_connect(struct Connection* conn)
     /* Send SET frame and receive UA.  */
     int ntries = conn->num_retransmissions;
     while (1) {
-        struct Frame reply;
+        struct frame reply;
         if ((ntries = f_send_acknowledged_frame(conn->fd, ntries,
                         conn->timeout_s,SET,&reply)) < 0)
         {
@@ -88,9 +88,9 @@ int transmitter_connect(struct Connection* conn)
 }
 
 // TODO
-int transmitter_write(struct Connection* conn,byte* data,size_t size)
+int transmitter_write(struct connection* conn,byte* data,size_t size)
 {
-    struct Frame out_frame = {
+    struct frame out_frame = {
         .address = A,
         .control = data_control_byte(conn->frame_number),
         .size = size,
@@ -103,7 +103,7 @@ int transmitter_write(struct Connection* conn,byte* data,size_t size)
     /* Send data frame and receive confirmation.  */
     int ntries = conn->num_retransmissions;
     while (1) {
-        struct Frame reply_frame;
+        struct frame reply_frame;
         if ((ntries = f_send_acknowledged_frame(
                         conn->fd,
 			ntries,
@@ -129,14 +129,14 @@ int transmitter_write(struct Connection* conn,byte* data,size_t size)
 /** \brief Establish logical connection.
  *
  * Open serial port, send SET, receive UA. */
-int disconnect(struct Connection* conn)
+int disconnect(struct connection* conn)
 {
     int return_value = 0;
 
     /* Send DISC and receive DISC.  */
     int ntries = conn->num_retransmissions;
     while (1) {
-        struct Frame reply;
+        struct frame reply;
         if ((ntries = f_send_acknowledged_frame(
                 conn->fd, ntries, conn->timeout_s,
                 DISC,&reply)) < 0)
@@ -175,7 +175,7 @@ int disconnect(struct Connection* conn)
 */
 
 // TODO
-int receiver_listen(struct Connection* conn)
+int receiver_listen(struct connection* conn)
 {
     conn->max_buffer_size = LL_MAX_PAYLOAD_STUFFED;
     conn->frame_number = 0;
@@ -189,7 +189,7 @@ int receiver_listen(struct Connection* conn)
 
     while (1)
     {
-        struct Frame in;
+        struct frame in;
         if (f_receive_frame(conn->fd,&in,0) == ERROR_CODE) {
             return -1;
         }
@@ -204,7 +204,7 @@ int receiver_listen(struct Connection* conn)
     }
 }
 
-int receiver_read(struct Connection* conn,byte *begin,size_t max_data_size,
+int receiver_read(struct connection* conn,byte *begin,size_t max_data_size,
         const int max_num_frames)
 {
     int num_frames = 0;
@@ -212,7 +212,7 @@ int receiver_read(struct Connection* conn,byte *begin,size_t max_data_size,
     byte *end = begin + max_data_size;
 
     while (p < end && (num_frames < max_num_frames || max_num_frames == 0)) {
-        struct Frame in;
+        struct frame in;
         in.data = p;
         in.max_data_size = end - p;
         Return_e ret = f_receive_frame(conn->fd,&in,0);
@@ -274,11 +274,11 @@ int receiver_read(struct Connection* conn,byte *begin,size_t max_data_size,
 }
 
 // TODO
-int wait_for_disconnect(struct Connection* conn,int timeout)
+int wait_for_disconnect(struct connection* conn,int timeout)
 {
     while (1)
     {
-        struct Frame in;
+        struct frame in;
         f_receive_frame(conn->fd,&in,0);
         if (in.control == C_DISC) {
             return handle_disconnect(conn);

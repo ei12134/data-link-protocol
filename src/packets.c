@@ -15,99 +15,116 @@
 
 int TRANSMITTER;
 
-struct Connection g_connections[MAX_FD];
+struct connection g_connections[MAX_FD];
 
-int llopen(char *port,int transmitter) 
+int send_file(int fd, struct file *file)
 {
-    struct Connection conn;
-    strcpy(conn.port,port);
-    conn.packet_size = PACKET_SIZE;
-    conn.micro_timeout_ds = MICRO_TIMEOUT_DS;
-    conn.timeout_s = TIMEOUT_S;
-    conn.num_retransmissions = NUM_RETRANSMISSIONS;
-    conn.close_wait_time = CLOSE_WAIT_TIME;
+	// send start control packet
+	struct control_packet scp = { .control_field = control_field_start, .t1 = file->size, .l1 = 0,
+			.v1 = 0, .t2 = 0, .l2 = 0, .v2 = 0 };
 
-    if ((conn.is_transmitter = transmitter)) {
-        if (transmitter_connect(&conn) < 0) {
-            return -1;
-        }
-    } else {
-        if (receiver_listen(&conn)) {
-            return -1;
-        }
-    }
+// send data packets
+	if (llwrite(fd, file->data, file->size) < 0) {
+		fprintf(stderr, "send_file: closing prematurely\n");
+		llclose(fd);
+		return 1;
+	}
 
-    g_connections[conn.fd] = conn;
-    return conn.fd;
+// send close control packet
+
+// end session
+	return llclose(fd);
 }
 
-void print_status(time_t t0,size_t num_bytes,unsigned long counter)
+int llopen(char *port, int transmitter)
 {
-    double dt = difftime(time(NULL),t0);
-    double speed = ((double)(num_bytes*8))/dt;
-    fprintf(stderr,"----------------------\n");
-    fprintf(stderr,"Link layer transmission %ld: %lf bit per sec; %ldB of data\n",
-		    counter,speed,num_bytes);
-    fprintf(stderr,"----------------------\n");
+	struct connection conn;
+	strcpy(conn.port, port);
+	conn.packet_size = PACKET_SIZE;
+	conn.micro_timeout_ds = MICRO_TIMEOUT_DS;
+	conn.timeout_s = TIMEOUT_S;
+	conn.num_retransmissions = NUM_RETRANSMISSIONS;
+	conn.close_wait_time = CLOSE_WAIT_TIME;
+
+	if ((conn.is_transmitter = transmitter)) {
+		if (transmitter_connect(&conn) < 0) {
+			return -1;
+		}
+	} else {
+		if (receiver_listen(&conn)) {
+			return -1;
+		}
+	}
+
+	g_connections[conn.fd] = conn;
+	return conn.fd;
+}
+
+void print_status(time_t t0, size_t num_bytes, unsigned long counter)
+{
+	double dt = difftime(time(NULL ), t0);
+	double speed = ((double) (num_bytes * 8)) / dt;
+	fprintf(stderr, "----------------------\n");
+	fprintf(stderr,
+			"Link layer transmission %ld: %lf bit per sec; %ldB of data\n",
+			counter, speed, num_bytes);
+	fprintf(stderr, "----------------------\n");
 }
 
 // TODO: return values
-int llwrite(const int fd,const char *buffer,int length)
+int llwrite(const int fd, const char *buffer, int length)
 {
-    struct Connection *conn = &g_connections[fd];
+	struct connection *conn = &g_connections[fd];
+	unsigned long counter = 0;
 
-    unsigned long counter = 0;
+	byte* p = (byte*) buffer;
+	while (length > 0) {
+		time_t t = time(NULL );
 
-    byte* p = (byte*)buffer;
-    while (length > 0) {
-        time_t t = time(NULL);
+		size_t remainder = length % conn->packet_size;
+		size_t num_bytes = remainder == 0 ? conn->packet_size : remainder;
+		//unsigned long num_bytes = ((length-1) % conn->packet_size) + 1;
 
+		if (transmitter_write(conn, p, num_bytes) < 0) {
+			return -1;
+		}
+		counter++;
+		p += num_bytes;
+		length -= num_bytes;
 
-	size_t remainder = length % conn->packet_size;
-	size_t num_bytes = remainder == 0 ? conn->packet_size : remainder;
-	//unsigned long num_bytes = ((length-1) % conn->packet_size) + 1;
-
-        if (transmitter_write(conn,p,num_bytes) < 0) {
-            return -1;
-        }
-	counter++;
-        p += num_bytes;
-        length -= num_bytes;
-
-        print_status(t,num_bytes,counter);
-    }
-    return 0;
+		print_status(t, num_bytes, counter);
+	}
+	return 0;
 }
 
-int llread(const int fd,const char *buffer,int buff_remaining)
+int llread(const int fd, const char *buffer, int buff_remaining)
 {
-    struct Connection* conn = &g_connections[fd];
+	struct connection* conn = &g_connections[fd];
+	unsigned long counter = 0;
 
-    unsigned long counter = 0;
+	byte* p = (byte*) buffer;
+	while (conn->is_active && buff_remaining > 0) {
+		time_t t = time(NULL );
 
-    byte* p = (byte*)buffer;
-    while (conn->is_active && buff_remaining > 0) {
-        time_t t = time(NULL);
+		int num_bytes;
+		if ((num_bytes = receiver_read(conn, p, buff_remaining,
+				NUM_FRAMES_PER_CALL)) < 0) {
+			fprintf(stderr, "llread(): there was an error\n");
+			break;
+		}
+		if (num_bytes > buff_remaining) {
+			fprintf(stderr, "too many bytes written... %d\n", __LINE__);
+		}
+		counter++;
+		p += num_bytes;
+		buff_remaining -= num_bytes;
 
-        int num_bytes;
-        if ((num_bytes = receiver_read(conn,p,buff_remaining,
-                        NUM_FRAMES_PER_CALL)) < 0) {
-            fprintf(stderr,"llread(): there was an error\n");
-            break;
-        }
-        if (num_bytes > buff_remaining) {
-            fprintf(stderr,"too many bytes written... %d\n",__LINE__);
-        }
-	counter++;
-        p += num_bytes;
-        buff_remaining -= num_bytes;
-
-        print_status(t,num_bytes,counter);
-    }
-    return p - (byte*)buffer;
+		print_status(t, num_bytes, counter);
+	}
+	return p - (byte*) buffer;
 }
 
 int llclose(int fd)
 {
-    return disconnect(&g_connections[fd]);
+	return disconnect(&g_connections[fd]);
 }

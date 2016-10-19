@@ -18,12 +18,12 @@ static long g_rec_frame_counter = 0;
 static long g_header_bcc_error_counter = 0;
 static long g_data_bcc_error_counter = 0;
 
-struct Frame FRAME(const byte control) {
-    struct Frame super = { .address = A, .control = control, .size = 0 };
+struct frame FRAME(const byte control) {
+    struct frame super = { .address = A, .control = control, .size = 0 };
     return super;
 }
 
-void f_print_frame(const struct Frame frame)
+void f_print_frame(const struct frame frame)
 {
     fprintf(stderr,"Frame:\n");
     fprintf(stderr,"A:%o C:%o S:%zu\n",
@@ -61,7 +61,7 @@ void f_dump_frame_buffer(const char *filename)
  *   data is too large)
  */
 static Return_e
-parse_frame_from_array(struct Frame* frame,byte *a)
+parse_frame_from_array(struct frame* frame,byte *a)
 {
     #ifdef DATA_LINK_DEBUG_MODE
     fprintf(stderr,"  parse_frame_from_array(): entering function.\n");
@@ -199,7 +199,7 @@ copy_and_stuff_bytes(
  * @return ERROR_CODE or ERROR_SUCCESS.
  */
 Return_e
-f_send_frame(const int fd,const struct Frame frame)
+f_send_frame(const int fd,const struct frame frame)
 {
     #ifdef DATA_LINK_DEBUG_MODE
     fprintf(stderr,"f_send_frame(): beginning frame writing (C=0x%2x, %zu bytes)\n",
@@ -261,7 +261,7 @@ void start_alarm(int s)
 /** 
  */
 Return_e
-f_receive_frame(const int fd,struct Frame* frame,const int timeout_s)
+f_receive_frame(const int fd,struct frame* frame,const int timeout_s)
 {
     #ifdef DATA_LINK_DEBUG_MODE
     fprintf(stderr,"  f_receive_frame(): beginning frame reception.\n");
@@ -333,8 +333,8 @@ f_send_acknowledged_frame(
         const int fd,
         const unsigned num_retransmissions,
         const int timeout_s,
-        struct Frame out_frame,
-        struct Frame *reply)
+        struct frame out_frame,
+        struct frame *reply)
 {
     int ntries = (num_retransmissions <= 0) ? -1 : num_retransmissions;
 

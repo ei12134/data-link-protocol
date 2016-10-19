@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include "packets.h"
+#include "file.h"
 
 #define TRUE 1
 #define FALSE 0
@@ -12,6 +13,8 @@
 int TRANSMITTER = FALSE;
 #define BUFSIZE (8*1024*1024)
 #define OUTPUT_TO_STDOUT 1
+
+struct file file;
 
 // Print how the arguments must be
 void print_help(char **argv)
@@ -47,7 +50,22 @@ int parse_args(int argc, char **argv)
 		else
 			TRANSMITTER = TRUE;
 
+		if (read_file_from_stdin(argv[2], &file) < 0) {
+			return -1;
+		}
 		return parse_serial_port_arg(2, argv);
+	}
+
+	if (argc == 4) {
+		if ((strcmp("-t", argv[1]) != 0))
+			return -2;
+		else
+			TRANSMITTER = TRUE;
+
+		if (read_file_from_disk(argv[2], &file) < 0) {
+			return -1;
+		}
+		return parse_serial_port_arg(3, argv);
 	} else
 		return -1;
 }
@@ -66,23 +84,12 @@ int main(int argc, char **argv)
 	if ((fd = llopen(port, TRANSMITTER)) < 0) {
 		return 1;
 	}
+
 	char *buffer = malloc(sizeof(char) * BUFSIZE);
 
 	if (TRANSMITTER) {
 		fprintf(stderr, "netlink: transmitting...\n");
-		int c;
-		do {
-			int i = 0;
-			while (i < BUFSIZE && (c = getc(stdin)) != EOF) {
-				buffer[i++] = c;
-			}
-			if (llwrite(fd, buffer, i) < 0) {
-				fprintf(stderr, "netlink: closing prematurely\n");
-				llclose(fd);
-				return 1;
-			}
-		} while (c != EOF);
-		return llclose(fd);
+		return send_file(fd, &file);
 	} else {
 		fprintf(stderr, "netlink: receiving...\n");
 
@@ -90,21 +97,25 @@ int main(int argc, char **argv)
 		int num_bytes;
 		int ret;
 		do {
-		    if ((num_bytes = llread(fd, buffer, BUFSIZE)) < 0) {
-                        fprintf(stderr, "netlink: closing prematurely\n");
-		        ret = -1;
-                        llclose(fd);
-		    }
-		    if (OUTPUT_TO_STDOUT) { printf("%.*s", num_bytes, buffer); }
-		    if ((ret = fwrite(buffer,sizeof(char),num_bytes,outfile)) < 0) {
-			fprintf(stderr,"netlink: file write error\n");
-                        break;
-		    }
+			if ((num_bytes = llread(fd, buffer, BUFSIZE)) < 0) {
+				fprintf(stderr, "netlink: closing prematurely\n");
+				ret = -1;
+				llclose(fd);
+			}
+			if (OUTPUT_TO_STDOUT) {
+				printf("%.*s", num_bytes, buffer);
+			}
+			if ((ret = fwrite(buffer, sizeof(char), num_bytes, outfile)) < 0) {
+				fprintf(stderr, "netlink: file write error\n");
+				break;
+			}
 		} while (num_bytes > 0);
 
-                printf("debug: num_bytes=%d\n",num_bytes);
+		printf("debug: num_bytes=%d\n", num_bytes);
 
-		if (fclose(outfile) < 1) { ret = -1; }
+		if (fclose(outfile) < 1) {
+			ret = -1;
+		}
 		free(buffer);
 
 		return ret;
