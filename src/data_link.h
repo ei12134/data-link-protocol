@@ -20,7 +20,7 @@ struct connection {
 	/* Settings */
 	char port[20];
 	size_t max_buffer_size;
-	size_t packet_size;
+	size_t frame_size;
 	unsigned num_retransmissions;
 	unsigned baudrate;
 	unsigned timeout_s;
@@ -28,6 +28,7 @@ struct connection {
 	unsigned close_wait_time;
 	int is_transmitter;
 	int is_active;
+	size_t packet_size;
 };
 
 int transmitter_connect(struct connection* conn);

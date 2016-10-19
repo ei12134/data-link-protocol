@@ -88,7 +88,7 @@ int transmitter_connect(struct connection* conn)
 }
 
 // TODO
-int transmitter_write(struct connection* conn,byte* data,size_t size)
+int transmitter_write(struct connection* conn, byte* data, size_t size)
 {
     struct frame out_frame = {
         .address = A,

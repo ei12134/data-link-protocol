@@ -4,7 +4,7 @@
 #include "byte.h"
 
 struct file {
-	const char* file_name;
+	const char* name;
 	size_t size;
 	char* data;
 };

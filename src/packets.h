@@ -1,12 +1,17 @@
 #ifndef PACKETS_H_
 #define PACKETS_H_
 
+#include <time.h>
 #include "byte.h"
 #include "file.h"
 
 const static int control_field_data = 1;
 const static int control_field_start = 2;
 const static int control_field_end = 3;
+
+const static int TLV_TYPE_FILESIZE = 0;
+const static int TLV_TYPE_NAME = 1;
+const static int PACKET_DATA_HEADER_SIZE = 4;
 
 struct data_packet {
 	byte control_field; // 1 - data
@@ -21,7 +26,7 @@ struct control_packet {
 	byte t1; // 0 - file size
 	byte l1; // v1 length
 	byte *v1; // file size
-	byte t2; // 0 - filename
+	byte t2; // 1 - filename
 	byte l2; // v2 length
 	byte *v2; // filename
 };
@@ -29,11 +34,14 @@ struct control_packet {
 //create_data_packet();
 //create_control_packet();
 
-int send_file(int fd, struct file *file);
+int send_file(char *port, struct file *file);
 //int receive_file(int fd)
 
+void print_status(time_t t0, size_t num_bytes, unsigned long counter);
+
+int connect(char *port, int transmitter);
 int llopen(char *port, int transmitter);
-int llwrite(const int fd, const char *buffer, int length);
+int send_packet(const int fd, const char *buffer, int length);
 int llread(const int fd, const char *buffer, int buff_remaining);
 int llclose(int fd);
 

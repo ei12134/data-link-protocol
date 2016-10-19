@@ -23,7 +23,7 @@ int read_file_from_stdin(const char *name, struct file *f)
 //			buffer);
 //	#endif
 
-	f->file_name = name;
+	f->name = name;
 	f->size = size;
 	f->data = buffer;
 	return 0;
@@ -42,7 +42,7 @@ int read_file_from_disk(const char *name, struct file *f)
 			fseek(file, 0, SEEK_SET);
 			fread(buffer, 1, length, file);
 			fclose(file);
-			f->file_name = name;
+			f->name = name;
 			f->size = length;
 			f->data = buffer;
 			return 0;

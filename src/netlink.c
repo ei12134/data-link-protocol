@@ -79,18 +79,14 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	char *port = argv[i];
-	int fd;
-	if ((fd = llopen(port, TRANSMITTER)) < 0) {
-		return 1;
-	}
-
 	char *buffer = malloc(sizeof(char) * BUFSIZE);
 
 	if (TRANSMITTER) {
 		fprintf(stderr, "netlink: transmitting...\n");
-		return send_file(fd, &file);
+		return send_file(argv[i], &file);
 	} else {
+
+		int fd = llopen(argv[i], 0);
 		fprintf(stderr, "netlink: receiving...\n");
 
 		FILE* outfile = fopen("imagem.gif", "w");

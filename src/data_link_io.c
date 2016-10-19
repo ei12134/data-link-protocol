@@ -65,7 +65,7 @@ parse_frame_from_array(struct frame* frame,byte *a)
 {
     #ifdef DATA_LINK_DEBUG_MODE
     fprintf(stderr,"  parse_frame_from_array(): entering function.\n");
-    f_dump_frame_buffer("FRAME");
+    //f_dump_frame_buffer("FRAME");
     #endif
 
     if (*a++ != FLAG) {
