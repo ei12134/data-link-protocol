@@ -32,7 +32,7 @@ struct connection {
 };
 
 int transmitter_connect(struct connection* conn);
-int transmitter_write(struct connection* conn, byte* data, size_t size);
+int transmitter_write(struct connection* conn, byte* data_packet, size_t size);
 
 int receiver_listen(struct connection* conn);
 int receiver_read(struct connection* conn, byte *data, size_t max_data_size,

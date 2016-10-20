@@ -10,10 +10,6 @@
 #define TRUE 1
 #define FALSE 0
 
-int TRANSMITTER = FALSE;
-#define BUFSIZE (8*1024*1024)
-#define OUTPUT_TO_STDOUT 1
-
 struct file file;
 
 // Print how the arguments must be
@@ -36,7 +32,7 @@ int parse_serial_port_arg(int index, char **argv)
 }
 
 // Verifies arguments
-int parse_args(int argc, char **argv)
+int parse_args(int argc, char **argv, int *is_transmitter)
 {
 	if (argc < 2)
 		return -1;
@@ -48,7 +44,7 @@ int parse_args(int argc, char **argv)
 		if ((strcmp("-t", argv[1]) != 0))
 			return -2;
 		else
-			TRANSMITTER = TRUE;
+			*is_transmitter = 1;
 
 		if (read_file_from_stdin(argv[2], &file) < 0) {
 			return -1;
@@ -59,8 +55,9 @@ int parse_args(int argc, char **argv)
 	if (argc == 4) {
 		if ((strcmp("-t", argv[1]) != 0))
 			return -2;
-		else
-			TRANSMITTER = TRUE;
+		else {
+			*is_transmitter = 1;
+		}
 
 		if (read_file_from_disk(argv[2], &file) < 0) {
 			return -1;
@@ -74,46 +71,17 @@ int main(int argc, char **argv)
 {
 	// Verifies arguments
 	int i = -1;
-	if ((i = parse_args(argc, argv)) < 0) {
+	int is_transmitter = 0;
+	if ((i = parse_args(argc, argv, &is_transmitter)) < 0) {
 		print_help(argv);
 		exit(1);
 	}
 
-	char *buffer = malloc(sizeof(char) * BUFSIZE);
-
-	if (TRANSMITTER) {
+	if (is_transmitter) {
 		fprintf(stderr, "netlink: transmitting...\n");
 		return send_file(argv[i], &file);
 	} else {
-
-		int fd = llopen(argv[i], 0);
 		fprintf(stderr, "netlink: receiving...\n");
-
-		FILE* outfile = fopen("imagem.gif", "w");
-		int num_bytes;
-		int ret;
-		do {
-			if ((num_bytes = llread(fd, buffer, BUFSIZE)) < 0) {
-				fprintf(stderr, "netlink: closing prematurely\n");
-				ret = -1;
-				llclose(fd);
-			}
-			if (OUTPUT_TO_STDOUT) {
-				printf("%.*s", num_bytes, buffer);
-			}
-			if ((ret = fwrite(buffer, sizeof(char), num_bytes, outfile)) < 0) {
-				fprintf(stderr, "netlink: file write error\n");
-				break;
-			}
-		} while (num_bytes > 0);
-
-		printf("debug: num_bytes=%d\n", num_bytes);
-
-		if (fclose(outfile) < 1) {
-			ret = -1;
-		}
-		free(buffer);
-
-		return ret;
+		return receive_file(argv[i]);
 	}
 }

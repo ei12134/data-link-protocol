@@ -8,30 +8,20 @@
 
 #define MAX_FD 10
 #define FRAME_SIZE LL_MAX_PAYLOAD_UNSTUFFED
-#define NUM_FRAMES_PER_CALL 10
+#define NUM_FRAMES_PER_CALL 1
 #define TIMEOUT_S 5
 #define MICRO_TIMEOUT_DS 5
 #define NUM_RETRANSMISSIONS 3
-#define CLOSE_WAIT_TIME 2
-
-int TRANSMITTER;
+#define CLOSE_WAIT_TIME 5
+#define BUFSIZE (8*1024*1024)
 
 struct connection g_connections[MAX_FD];
 
 int send_file(char *port, struct file *file)
 {
 	// create connection
-//	struct connection conn;
-//	strcpy(conn.port, port);
-//	conn.frame_size = FRAME_SIZE;
-//	conn.micro_timeout_ds = MICRO_TIMEOUT_DS;
-//	conn.timeout_s = TIMEOUT_S;
-//	conn.num_retransmissions = NUM_RETRANSMISSIONS;
-//	conn.close_wait_time = CLOSE_WAIT_TIME;
-
 	int fd = llopen(port, 1);
 	struct connection* conn = &g_connections[fd];
-	printf("0\n");
 
 //	if (transmitter_connect(&conn) < 0) {
 //		return -1;
@@ -58,74 +48,132 @@ int send_file(char *port, struct file *file)
 ////	memcpy(scp + sizeof scp.,                    s.member2, sizeof s.member2);
 ////	memcpy(scp + sizeof s.member1 + sizeof s.member2, s.member3, sizeof s.member3);
 
-	// send data packets
-	byte* buff = malloc(conn->packet_size * sizeof(byte));
-	byte* p = (byte*) file->data;
+// send data packets
 	int seq = 0;
+	size_t num_data_bytes_sent = 0;
+	byte* file_data_pointer = (byte*) file->data;
+	const byte* eof_data_pointer = ((byte*) file->data
+			+ file->size * sizeof(char));
 
-	while (p < ((byte*) file->data + file->size * sizeof(char))) {
-//		// send data packet
-//		struct data_packet dpk;
-//		dpk.control_field = control_field_data;
-//
-//		dpk.sequence_number = seq++ % 255;
-//
-//		size_t remainder = file->size % conn->packet_size;
-//		size_t num_bytes = remainder == 0 ? conn->packet_size : remainder;
-//
-//		dpk.l2 = num_bytes / 256;
-//		dpk.l1 = num_bytes % 256;
+	while (file_data_pointer < eof_data_pointer) {
+		size_t max_data_size = conn->packet_size - packet_data_header_size;
+		size_t remaining_data_bytes = file->size - num_data_bytes_sent;
+		size_t remainder = remaining_data_bytes % (max_data_size);
+		size_t data_bytes_to_send =
+				remainder == 0 ? (max_data_size) : remainder;
 
-		size_t remainder = file->size % (conn->packet_size - 4);
-		size_t num_bytes = remainder == 0 ? (conn->packet_size - 4) : remainder;
-		buff[0] = control_field_data;
-		buff[1] = seq++ % 255;
-		buff[2] = num_bytes / 256;
-		buff[3] = num_bytes % 256;
+		size_t data_packet_size = data_bytes_to_send + packet_data_header_size;
+		byte* data_packet = malloc((data_packet_size) * sizeof(byte));
 
-		for (int i = 0; i < file->size; ++i) {
-			buff[i + 4] = file->data[i];
+		data_packet[0] = control_field_data;
+		data_packet[1] = seq++ % 255;
+		data_packet[2] = data_bytes_to_send / 256;
+		data_packet[3] = data_bytes_to_send % 256;
+
+		for (size_t i = 0;
+				file_data_pointer < eof_data_pointer && i < data_bytes_to_send;
+				i++, file_data_pointer++, num_data_bytes_sent++) {
+			data_packet[i + packet_data_header_size] =
+					(byte) file->data[num_data_bytes_sent];
 		}
 
-		if (transmitter_write(conn, buff, num_bytes + PACKET_DATA_HEADER_SIZE) < 0) {
+		if (transmitter_write(conn, data_packet,
+				(data_bytes_to_send + packet_data_header_size)) < 0) {
 			return -1;
 		}
 
-		p += num_bytes;
+		free(data_packet);
 	}
-
 // send close control packet
 
 // end session
+	fprintf(stderr, "attempt to disconnect\n");
 	return llclose(fd);
 }
 
-int llread(const int fd, const char *msg, int buff_remaining)
-{ //	return p - (byte*) buffer;
-//}
-	struct connection* conn = &g_connections[fd];
-	unsigned long counter = 0;
+int receive_file(char *port)
+{
+	int fd = llopen(port, 0);
 
-	byte* p = (byte*) msg;
-	while (conn->is_active && buff_remaining > 0) {
-		time_t t = time(NULL );
+	FILE* output_file = fopen("imagem.gif", "w");
+	int ret = 0;
+	int file_data_length = 1;
 
-		int num_bytes;
-		if ((num_bytes = receiver_read(conn, p, buff_remaining,
-				NUM_FRAMES_PER_CALL)) < 0) {
-			fprintf(stderr, "llread(): there was an error\n");
-			break;
+	while (file_data_length > 0) {
+
+		char *file_data;
+
+		if ((file_data_length = llread(fd, &file_data)) < 0) {
+			fprintf(stderr, "netlink: closing prematurely\n");
+			ret = -1;
+			llclose(fd);
+			exit(EXIT_FAILURE);
 		}
-		if (num_bytes > buff_remaining) {
-			fprintf(stderr, "too many bytes written... %d\n", __LINE__);
+		if (1) {
+			printf("%.*s\n", file_data_length, file_data);
 		}
-		counter++;
-		p += num_bytes;
-		buff_remaining -= num_bytes;
+		if ((ret = fwrite(file_data, sizeof(char), file_data_length,
+				output_file)) < 0) {
+			fprintf(stderr, "netlink: file write error\n");
+			return -1;
+		}
 
-		print_status(t, num_bytes, counter);
+		if (file_data_length > 0) {
+			free(file_data);
+		}
 	}
-	return p - (byte*) msg;
+
+	printf("debug: num_bytes=%d\n", file_data_length);
+
+	if (fclose(output_file) < 1) {
+		ret = -1;
+	}
+
+	return llclose(fd);
+}
+
+int parse_data_packet(const int data_packet_length, byte *data_packet,
+		char **data)
+{
+	int data_size = data_packet[l2_index] * 256 + data_packet[l1_index];
+	fprintf(stderr, "  parse_data_packet()\n");
+	fprintf(stderr, "\tcontrol_field=%d\n", data_packet[control_field_index]);
+	fprintf(stderr, "\tsequence_number=%d\n",
+			data_packet[sequence_number_index]);
+	fprintf(stderr, "\tdata_size=%d\n", data_size);
+	*data = malloc(
+			sizeof(char) * (data_packet_length - packet_data_header_size));
+	memcpy(*data, (data_packet + packet_data_header_size * sizeof(byte)),
+			data_size);
+	free(data_packet);
+	return data_size;
+}
+
+int llread(const int fd, char **data)
+{
+	struct connection* conn = &g_connections[fd];
+
+	// maximum size of a packet
+	byte *data_packet = malloc(sizeof(byte) * conn->packet_size);
+
+	int data_packet_length = 0;
+	if (conn->is_active) {
+		if ((data_packet_length = receiver_read(conn, data_packet,
+				conn->packet_size, NUM_FRAMES_PER_CALL)) < 0) {
+			fprintf(stderr, "llread(): there was an error\n");
+			return -1;
+		}
+	} else
+		return -1;
+
+	byte control_field = data_packet[control_field_index];
+
+	if (control_field == control_field_data)
+		return parse_data_packet(data_packet_length, data_packet, data);
+	else {
+		fprintf(stderr, "  llread() bad packet control_field\n");
+		return 0;
+	}
 }
 
 int llopen(char *port, int transmitter)
@@ -189,34 +237,6 @@ void print_status(time_t t0, size_t num_bytes, unsigned long counter)
 	fprintf(stderr, "----------------------\n");
 }
 
-int llwrite(const int fd, const char *buffer, int length)
-{
-	struct connection *conn = &g_connections[fd];
-	unsigned long counter = 0;
-
-	byte* p = malloc(conn->packet_size * sizeof(byte));
-	while (length > 0) {
-		time_t t = time(NULL );
-
-		size_t remainder = length % conn->frame_size;
-		size_t num_bytes = remainder == 0 ? conn->frame_size : remainder;
-		//unsigned long num_bytes = ((length-1) % conn->packet_size) + 1;
-
-		if (transmitter_write(conn, p, num_bytes) < 0) {
-			return -1;
-		}
-		counter++;
-//		memcpy() ?????
-		p += num_bytes;
-		length -= num_bytes;
-
-		print_status(t, num_bytes, counter);
-	}
-	free(p);
-
-	return 0;
-}
-
 //int llread(const int fd, const char *buffer, int buff_remaining)
 //{
 //	struct connection* conn = &g_connections[fd];
@@ -244,7 +264,7 @@ int llwrite(const int fd, const char *buffer, int length)
 //	return p - (byte*) buffer;
 //}
 
-int llclose(int fd)
+int llclose(const int fd)
 {
 	return disconnect(&g_connections[fd]);
 }

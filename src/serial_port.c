@@ -62,12 +62,10 @@ int serial_port_open(const char *dev_name, const int micro_timeout)
 	bzero(&newtio, sizeof(newtio)); /* clear struct for new port settings */
 	newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
 	//newtio.c_iflag = IGNPAR | ICRNL;
+//	newtio.c_iflag = IGNPAR;
+//	newtio.c_oflag = OPOST; // 0?
 	newtio.c_iflag = IGNPAR;
-	newtio.c_oflag = OPOST; // 0?
-	newtio.c_oflag &= ~OCRNL;
-
-	/* set input mode (non-canonical, no echo,...) */
-	//newtio.c_lflag &= ~(ICANON | ECHO);
+	newtio.c_oflag = 0;
 	newtio.c_lflag = 0;
 
 	/* 0 => inter-character timer unused */
