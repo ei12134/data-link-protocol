@@ -87,7 +87,6 @@ int transmitter_connect(struct Connection* conn)
     return 0;
 }
 
-// TODO
 int transmitter_write(struct Connection* conn,byte* data,size_t size)
 {
     struct Frame out_frame = {
@@ -96,6 +95,12 @@ int transmitter_write(struct Connection* conn,byte* data,size_t size)
         .size = size,
         .data = data
     };
+
+    printf(" ###################################### \n");
+    printf("\n");
+    printf(" BEGIN TRANSMIT %x\n", out_frame.control);
+    printf("\n");
+    printf(" ###################################### \n");
 
     byte success_rep = data_reply_byte(conn->frame_number,TRUE);
     byte rej_rep     = data_reply_byte(conn->frame_number,FALSE);
@@ -121,6 +126,13 @@ int transmitter_write(struct Connection* conn,byte* data,size_t size)
             break;
         }
     }
+
+    printf(" ###################################### \n");
+    printf("\n");
+    printf(" END TRANSMIT %x\n", out_frame.control);
+    printf("\n");
+    printf(" ###################################### \n");
+
 
     conn->frame_number++;
     return 0;
@@ -217,6 +229,12 @@ int receiver_read(struct Connection* conn,byte *begin,size_t max_data_size,
         in.max_data_size = end - p;
         Return_e ret = f_receive_frame(conn->fd,&in,0);
 
+	printf(" ###################################### \n");
+	printf("\n");
+	printf(" BEGIN RECEIVE %x\n", in.control);
+	printf("\n");
+	printf(" ###################################### \n");
+
         if (ret == ERROR_CODE) {
             return -1;
         }
@@ -267,7 +285,13 @@ int receiver_read(struct Connection* conn,byte *begin,size_t max_data_size,
             if (f_send_frame(conn->fd,FRAME(control)) != SUCCESS_CODE) {
                 break;
             }
-            conn->frame_number++;
+	    printf(" ###################################### \n");
+	    printf("\n");
+	    printf(" END RECEIVE %x\n", in.control);
+	    printf("\n");
+	    printf(" ###################################### \n");
+
+	    conn->frame_number++;
         }
     }
     return p - begin;
