@@ -37,7 +37,7 @@ int send_file(char *port, struct file *file, int max_send_attempts)
 			} else {
 #ifdef APPLICATION_LAYER_DEBUG_MODE
 				fprintf(stderr, "llopen() returned an error code\n");
-				fprintf(stderr, "\t% dattempts left\n", attempts_left - 1);
+				fprintf(stderr, "\t%d attempts left\n", attempts_left - 1);
 #endif
 				state = SND_OPEN_CONNECTION;
 				retry(&attempts_left);
@@ -49,7 +49,7 @@ int send_file(char *port, struct file *file, int max_send_attempts)
 #ifdef APPLICATION_LAYER_DEBUG_MODE
 				fprintf(stderr,
 						"start of transmission send_start_control_packet() returned an error code\n");
-				fprintf(stderr, "\t% dattempts left\n", attempts_left - 1);
+				fprintf(stderr, "\t%d attempts left\n", attempts_left - 1);
 #endif
 				retry(&attempts_left);
 			} else {
@@ -62,7 +62,7 @@ int send_file(char *port, struct file *file, int max_send_attempts)
 					&sequence_number) < 0) {
 #ifdef APPLICATION_LAYER_DEBUG_MODE
 				fprintf(stderr, "send_data_packets() returned an error code\n");
-				fprintf(stderr, "\t% dattempts left\n", attempts_left - 1);
+				fprintf(stderr, "\t%d attempts left\n", attempts_left - 1);
 #endif
 				retry(&attempts_left);
 			} else {
@@ -75,7 +75,7 @@ int send_file(char *port, struct file *file, int max_send_attempts)
 #ifdef APPLICATION_LAYER_DEBUG_MODE
 				fprintf(stderr,
 						"end of transmission send_control_packet() returned an error code");
-				fprintf(stderr, "\t% dattempts left\n", attempts_left - 1);
+				fprintf(stderr, "\t%d attempts left\n", attempts_left - 1);
 #endif
 				retry(&attempts_left);
 			} else {
@@ -238,7 +238,7 @@ int receive_file(char *port, int max_receive_attempts)
 #ifdef APPLICATION_LAYER_DEBUG_MODE
 				fprintf(stderr,
 						"receive_start_control_packet() returned an error code\n");
-				fprintf(stderr, "\t% dattempts left\n", attempts_left - 1);
+				fprintf(stderr, "\t%d attempts left\n", attempts_left - 1);
 #endif
 				retry(&attempts_left);
 				break;
@@ -321,7 +321,7 @@ int receive_data_packets(const int fd, char* file_name, size_t file_size,
 				file_data_length, sequence_number)) < 0) {
 #ifdef APPLICATION_LAYER_DEBUG_MODE
 			fprintf(stderr, "receive_data_packet() returned an error code\n");
-			fprintf(stderr, "\t% dattempts left\n", attempts_left - 1);
+			fprintf(stderr, "\t%d attempts left\n", attempts_left - 1);
 #endif
 			retry(&attempts_left);
 			received_data_bytes = 1;
@@ -441,7 +441,7 @@ int parse_data_packet(const int data_packet_length, byte *data_packet,
 	if (data_packet[data_packet_sequence_number_index]
 			!= (sequence_number % sequence_number_modulus)) {
 #ifdef APPLICATION_LAYER_DEBUG_MODE
-		fprintf(stderr, "bad sequence number: (received %d) - (expected: %zu)\n", data_packet[data_packet_sequence_number_index], (sequence_number % sequence_number_modulus));
+		fprintf(stderr, "bad packet sequence number: (received %d) <-> (expected %zu)\n", data_packet[data_packet_sequence_number_index], (sequence_number % sequence_number_modulus));
 #endif
 		free(data_packet);
 		free(*data);
@@ -513,7 +513,7 @@ int receive_data_packet(const int fd, char **file_data,
 				&file_size) == 0) {
 			if (received_file_bytes != file_size) {
 				fprintf(stderr,
-						"ERROR: received %zu bytes from %zu file bytes\n",
+						"ERROR: (received %zu bytes) <-> (expected %zu file bytes)\n",
 						file_size, received_file_bytes);
 				return -2;
 			}
