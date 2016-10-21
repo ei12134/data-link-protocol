@@ -69,7 +69,11 @@ int send_control_packet(struct connection* connection, struct file *file,
 	fprintf(stderr, "\tl2=%zu\n", strlen(file->name));
 #endif
 
-	byte* control_packet = malloc(control_packet_size * sizeof(byte));
+	byte* control_packet;
+	if ((control_packet = malloc(control_packet_size * sizeof(byte))) == NULL ) {
+		perror("send_control_packet() control_packet malloc error");
+		return -1;
+	}
 	control_packet[control_field_index] = control_field;
 
 	// TLV (file size)
@@ -123,7 +127,12 @@ int send_data_packets(struct connection* connection, struct file* file)
 				remainder == 0 ? (max_data_size) : remainder;
 
 		size_t data_packet_size = data_bytes_to_send + data_packet_header_size;
-		byte* data_packet = malloc(data_packet_size * sizeof(byte));
+
+		byte* data_packet;
+		if ((data_packet = malloc(data_packet_size * sizeof(byte))) == NULL ) {
+			perror("send_control_packet() data_packet malloc error");
+			return -1;
+		}
 
 		data_packet[control_field_index] = control_field_data;
 		data_packet[data_packet_sequence_number_index] = (sequence_number++
@@ -153,45 +162,65 @@ int send_data_packets(struct connection* connection, struct file* file)
 
 int receive_file(char *port, int receive_attempts)
 {
-	int fd = llopen(port, 0);
-
+	int fd = 0;
+	int attempts = receive_attempts;
 	char *file_name;
 	size_t file_size;
+	int state = RCV_OPEN_CONNECTION;
 
-	if (receive_start_control_packet(fd, &file_name, &file_size) < 0) {
-#ifdef APPLICATION_LAYER_DEBUG_MODE
-		fprintf(stderr,
-				"receive_start_control_packet() returned an error code\n");
-		fprintf(stderr, "\tattempts left %d failed\n", receive_attempts);
-#endif
-		if (receive_attempts > 0) {
-			if (llclose(fd) == 0) {
-				return receive_file(port, --receive_attempts);
+	while (attempts) {
+		switch (state) {
+		case RCV_OPEN_CONNECTION:
+			if ((fd = llopen(port, 0)) > 0) {
+				state = RCV_START_CONTROL_PACKET;
+				attempts = receive_attempts;
+			} else {
+				attempts--;
 			}
-		} else {
-			fprintf(stderr,
-					"receive_start_control_packet() maximum attempts reached\n");
-			return llclose(fd);
+			break;
+
+		case RCV_START_CONTROL_PACKET:
+			if (receive_start_control_packet(fd, &file_name, &file_size) < 0) {
+				attempts--;
+#ifdef APPLICATION_LAYER_DEBUG_MODE
+				fprintf(stderr,
+						"receive_start_control_packet() returned an error code\n");
+				fprintf(stderr, "\tattempts left %d\n", attempts);
+#endif
+				break;
+			} else {
+				state = RCV_DATA_PACKETS;
+				attempts = receive_attempts;
+			}
+			break;
+
+		case RCV_DATA_PACKETS:
+			if (receive_data_packets(fd, file_name, file_size) < 0) {
+				attempts--;
+#ifdef APPLICATION_LAYER_DEBUG_MODE
+				fprintf(stderr, "receive_data_packets() returned an error code\n");
+				fprintf(stderr, "\tattempts left %d\n", attempts);
+#endif
+				break;
+			} else {
+				state = RCV_CLOSE_CONNECTION;
+				attempts = receive_attempts;
+			}
+			break;
+
+		case RCV_CLOSE_CONNECTION:
+			if (llclose(fd) == 0) {
+				return 0;
+			} else {
+				state = RCV_CLOSE_CONNECTION;
+				attempts--;
+			}
+			break;
+		default:
+			return -1;
 		}
 	}
-
-	if (receive_data_packets(fd, file_name, file_size) < 0) {
-#ifdef APPLICATION_LAYER_DEBUG_MODE
-		fprintf(stderr, "receive_data_packets() returned an error code\n");
-		fprintf(stderr, "\tattempts left %d failed\n", receive_attempts);
-#endif
-		if (receive_attempts > 0) {
-			if (llclose(fd) == 0) {
-				return receive_file(port, --receive_attempts);
-			}
-		} else {
-			fprintf(stderr,
-					"receive_start_control_packet() maximum attempts reached\n");
-			return llclose(fd);
-		}
-	}
-
-	return llclose(fd);
+	return -1;
 }
 
 int receive_start_control_packet(const int fd, char **file_name,
@@ -285,7 +314,13 @@ int parse_control_packet(const int control_packet_length, byte *control_packet,
 		return -1;
 	}
 
-	size_t *file_size_tmp = malloc(sizeof(size_t));
+	size_t *file_size_tmp;
+
+	if ((file_size_tmp = malloc(sizeof(size_t))) == NULL ) {
+		perror("parse_control_packet() file_size_tmp malloc error");
+		return -1;
+	}
+
 	memcpy(file_size_tmp, (control_packet + control_packet_v1_index),
 			v1_length);
 	*file_size = *file_size_tmp;
@@ -299,11 +334,18 @@ int parse_control_packet(const int control_packet_length, byte *control_packet,
 
 	if (t2 != control_packet_tlv_type_name) {
 		fprintf(stderr, "parse_control_packet(): bad type 2");
+		free(file_size_tmp);
 		return -1;
 	}
 
 	size_t v2_length = *(control_packet + control_packet_l2_index);
-	*file_name = malloc(v2_length * sizeof(char));
+
+	if ((*file_name = malloc(v2_length * sizeof(char))) == NULL ) {
+		perror("parse_control_packet() file_name malloc error");
+		free(file_size_tmp);
+		return -1;
+	}
+
 	memcpy(*file_name, (control_packet + control_packet_v2_index), v2_length);
 
 #ifdef APPLICATION_LAYER_DEBUG_MODE
@@ -328,10 +370,16 @@ int parse_data_packet(const int data_packet_length, byte *data_packet,
 			data_packet[data_packet_sequence_number_index]);
 	fprintf(stderr, "\tdata_size=%d\n", data_size);
 #endif
-	*data = malloc(sizeof(char) * data_size);
+
+	if ((*data = malloc(sizeof(char) * data_size)) == NULL ) {
+		perror("parse_data_packet() data malloc error");
+		return -1;
+	}
+
 	memcpy(*data, (data_packet + data_packet_header_size * sizeof(byte)),
 			data_size);
-	if (sequence_number != data_packet[data_packet_sequence_number_index]) {
+	if ((sequence_number % 255)
+			!= data_packet[data_packet_sequence_number_index]) {
 #ifdef APPLICATION_LAYER_DEBUG_MODE
 		fprintf(stderr, "Error: bad sequence number (%d - expected: %zu)\n", data_packet[data_packet_sequence_number_index], sequence_number);
 #endif
@@ -348,18 +396,23 @@ int llread(const int fd, byte **packet)
 
 // maximum size of a packet
 	size_t packet_size = c->packet_size * sizeof(byte);
-	*packet = malloc(packet_size);
+
+	if ((*packet = malloc(packet_size)) == NULL ) {
+		perror("llread() packet malloc error");
+		return -1;
+	}
 
 	int packet_length = 0;
 	if (c->is_active) {
 		if ((packet_length = receiver_read(c, *packet, packet_size,
 				NUM_FRAMES_PER_CALL)) < 0) {
-			fprintf(stderr,
-					"receive_packet(): error in the receiver_read() call\n");
+			fprintf(stderr, "llread(): error in receiver_read()\n");
+			free(*packet);
 			return -1;
 		}
 	} else {
-		fprintf(stderr, "receive_packet(): connection is not active\n");
+		fprintf(stderr, "llread(): connection is not active\n");
+		free(*packet);
 		return -1;
 	}
 
@@ -395,15 +448,18 @@ int receive_data_packet(const int fd, char **data, size_t received_file_bytes,
 #endif
 		char* file_name;
 		size_t file_size;
-		parse_control_packet(data_packet_length, data_packet, &file_name,
-				&file_size);
-		if (received_file_bytes != file_size) {
-			fprintf(stderr, "Error: received %zu bytes from %zu file bytes\n",
-					file_size, received_file_bytes);
-			free(data_packet);
-			return -2;
+		if (parse_control_packet(data_packet_length, data_packet, &file_name,
+				&file_size) == 0) {
+			if (received_file_bytes != file_size) {
+				fprintf(stderr,
+						"Error: received %zu bytes from %zu file bytes\n",
+						file_size, received_file_bytes);
+				return -2;
+			}
+			return 0;
+		} else {
+			return -1;
 		}
-		return 0;
 	}
 
 	fprintf(stderr, "receive_data_packet(): bad control field value\n");

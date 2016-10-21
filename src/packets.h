@@ -27,6 +27,12 @@ const static size_t data_packet_sequence_number_index = 1;
 const static size_t data_packet_l2_index = 2;
 const static size_t data_packet_l1_index = 3;
 
+// receiver state machine
+#define RCV_OPEN_CONNECTION 0
+#define RCV_START_CONTROL_PACKET 1
+#define RCV_DATA_PACKETS 2
+#define RCV_CLOSE_CONNECTION 3
+
 void print_status(time_t t0, size_t num_bytes, unsigned long counter);
 
 int send_file(char *port, struct file *file);
