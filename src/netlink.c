@@ -15,9 +15,12 @@ struct file file;
 // Print how the arguments must be
 void print_help(char **argv)
 {
-	fprintf(stderr, "Usage: %s [OPTION] <serial port>\n", argv[0]);
+	fprintf(stderr, "Usage: %s [OPTIONS] <serial port>\n", argv[0]);
 	fprintf(stderr, "\n Program options:\n");
-	fprintf(stderr, "  -t         transmit data over the serial port\n");
+	fprintf(stderr, "  -t\t\t\ttransmit data over the serial port\n");
+	fprintf(stderr, "  -b <BAUDRATE>\t\tbaudrate of the serial port\n");
+	fprintf(stderr, "  -i <FRAMESIZE>\tmaximum unstuffed frame size\n");
+	fprintf(stderr, "  -r <RETRY>\t\tnumber of retry attempts\n");
 }
 
 // Verifies serial port argument
@@ -70,18 +73,19 @@ int parse_args(int argc, char **argv, int *is_transmitter)
 int main(int argc, char **argv)
 {
 	// Verifies arguments
-	int i = -1;
+	int port_index = -1;
 	int is_transmitter = 0;
-	if ((i = parse_args(argc, argv, &is_transmitter)) < 0) {
+
+	if ((port_index = parse_args(argc, argv, &is_transmitter)) < 0) {
 		print_help(argv);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	if (is_transmitter) {
-		fprintf(stderr, "netlink: transmitting...\n");
-		return send_file(argv[i], &file);
+		fprintf(stderr, "netlink: transmitting %s\n", file.name);
+		return send_file(argv[port_index], &file);
 	} else {
-		fprintf(stderr, "netlink: receiving...\n");
-		return receive_file(argv[i], 5);
+		fprintf(stderr, "netlink: receiving file\n");
+		return receive_file(argv[port_index], 5);
 	}
 }

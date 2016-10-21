@@ -215,6 +215,7 @@ int receive_data_packets(const int fd, char* file_name, size_t file_size)
 	FILE* received_file = fopen(file_name, "w");
 	int received_data_bytes = 1;
 	int file_data_length = 0;
+	size_t sequence_number = 0;
 
 #ifdef APPLICATION_LAYER_DEBUG_MODE
 	fprintf(stderr, "receive_data_packets()\n");
@@ -227,9 +228,11 @@ int receive_data_packets(const int fd, char* file_name, size_t file_size)
 		char *file_data;
 
 		if ((received_data_bytes = receive_data_packet(fd, &file_data,
-				file_data_length)) < 0) {
-			fprintf(stderr, "netlink: closing prematurely\n");
-			return llclose(fd);
+				file_data_length, sequence_number++)) < 0) {
+#ifdef APPLICATION_LAYER_DEBUG_MODE
+			fprintf(stderr, "receive_data_packet() returned an error code\n");
+#endif
+			return received_data_bytes;
 		}
 		file_data_length += received_data_bytes;
 
@@ -240,7 +243,7 @@ int receive_data_packets(const int fd, char* file_name, size_t file_size)
 
 		if ((fwrite(file_data, sizeof(char), received_data_bytes, received_file))
 				< 0) {
-			fprintf(stderr, "netlink: file write error\n");
+			fprintf(stderr, "Error: file write error\n");
 			return -1;
 		}
 
@@ -308,18 +311,27 @@ int parse_control_packet(const int control_packet_length, byte *control_packet,
 }
 
 int parse_data_packet(const int data_packet_length, byte *data_packet,
-		char **data)
+		char **data, size_t sequence_number)
 {
 	int data_size = data_packet[data_packet_l2_index] * 256
 			+ data_packet[data_packet_l1_index];
+#ifdef APPLICATION_LAYER_DEBUG_MODE
 	fprintf(stderr, "parse_data_packet()\n");
 	fprintf(stderr, "\tcontrol_field=%d\n", data_packet[control_field_index]);
 	fprintf(stderr, "\tsequence_number=%d\n",
 			data_packet[data_packet_sequence_number_index]);
 	fprintf(stderr, "\tdata_size=%d\n", data_size);
+#endif
 	*data = malloc(sizeof(char) * data_size);
 	memcpy(*data, (data_packet + data_packet_header_size * sizeof(byte)),
 			data_size);
+	if (sequence_number != data_packet[data_packet_sequence_number_index]) {
+#ifdef APPLICATION_LAYER_DEBUG_MODE
+		fprintf(stderr, "Error: bad sequence number (%d - expected: %zu)\n", data_packet[data_packet_sequence_number_index], sequence_number);
+#endif
+		free(data_packet);
+		return -1;
+	}
 	free(data_packet);
 	return data_size;
 }
@@ -348,7 +360,8 @@ int llread(const int fd, byte **packet)
 	return packet_length;
 }
 
-int receive_data_packet(const int fd, char **data, size_t received_file_bytes)
+int receive_data_packet(const int fd, char **data, size_t received_file_bytes,
+		size_t sequence_number)
 {
 	byte *data_packet;
 	int data_packet_length = 0;
@@ -365,13 +378,14 @@ int receive_data_packet(const int fd, char **data, size_t received_file_bytes)
 	byte control_field = data_packet[control_field_index];
 	if (control_field == control_field_data) {
 #ifdef APPLICATION_LAYER_DEBUG_MODE
-		fprintf(stderr, "\treceived data packet\n");
+		fprintf(stderr, "\tdata packet\n");
 #endif
 
-		return parse_data_packet(data_packet_length, data_packet, data);
+		return parse_data_packet(data_packet_length, data_packet, data,
+				sequence_number);
 	} else if (control_field == control_field_end) {
 #ifdef APPLICATION_LAYER_DEBUG_MODE
-		fprintf(stderr, "\treceived end control packet\n");
+		fprintf(stderr, "\tend control packet\n");
 #endif
 		char* file_name;
 		size_t file_size;
