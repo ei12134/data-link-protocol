@@ -22,30 +22,32 @@ int send_file(char *port, struct file *file)
 	int fd = llopen(port, 1);
 	struct connection* connection = &g_connections[fd];
 
-	if (connection->is_active) {
-		// send start control packet
-		if (send_start_control_packet(connection, file) < 0) {
-			fprintf(stderr,
-					"send_start_control_packet() returned an error code");
-			return llclose(fd);
-		}
+	// send start control packet
+	if (send_control_packet(connection, file, control_field_start) < 0) {
+		fprintf(stderr,
+				"start of transmission send_start_control_packet() returned an error code");
+		return llclose(fd);
+	}
 
-		// send data packets
-		if (send_data_packets(connection, file) < 0) {
-			fprintf(stderr, "send_data_packets() returned an error code");
-			return llclose(fd);
-		}
-	} else {
-		fprintf(stderr, "send_file(): connection is not active\n");
+	// send data packets
+	if (send_data_packets(connection, file) < 0) {
+		fprintf(stderr, "send_data_packets() returned an error code");
+		return llclose(fd);
 	}
 
 	// send close control packet
+	if (send_control_packet(connection, file, control_field_end) < 0) {
+		fprintf(stderr,
+				"end of transmission send_control_packet() returned an error code");
+		return llclose(fd);
+	}
 
 	// end session
 	return llclose(fd);
 }
 
-int send_start_control_packet(struct connection* connection, struct file *file)
+int send_control_packet(struct connection* connection, struct file *file,
+		byte control_field)
 {
 	// 5 bytes plus 2 specific data type sizes (value fields)
 	size_t control_packet_size = (5 + sizeof(size_t)
@@ -56,7 +58,8 @@ int send_start_control_packet(struct connection* connection, struct file *file)
 	}
 
 #ifdef APPLICATION_LAYER_DEBUG_MODE
-	fprintf(stderr, "  send_start_control_packet()\n");
+	fprintf(stderr, "  send_control_packet()\n");
+	fprintf(stderr, "\tcontrol_field=%d\n", control_field);
 	fprintf(stderr, "\tcontrol_packet_size=%zu\n", control_packet_size);
 	fprintf(stderr, "\tpacket_size=%zu\n", (connection->packet_size));
 	fprintf(stderr, "\tfile_size=%zu\n", file->size);
@@ -64,8 +67,7 @@ int send_start_control_packet(struct connection* connection, struct file *file)
 #endif
 
 	byte* control_packet = malloc(control_packet_size * sizeof(byte));
-
-	control_packet[control_field_index] = control_field_start;
+	control_packet[control_field_index] = control_field;
 
 	// TLV (file size)
 	size_t v1_length = sizeof(size_t);
@@ -172,7 +174,7 @@ int receive_start_control_packet(const int fd, char **file_name,
 	byte *control_packet;
 	int control_packet_length = 0;
 
-	if ((control_packet_length = receive_packet(fd, &control_packet)) < 0) {
+	if ((control_packet_length = llread(fd, &control_packet)) < 0) {
 		return -1;
 	}
 
@@ -188,7 +190,7 @@ int receive_start_control_packet(const int fd, char **file_name,
 int receive_data_packets(const int fd, char* file_name, size_t file_size)
 {
 	FILE* received_file = fopen(file_name, "w");
-	int received_data_bytes = 0;
+	int received_data_bytes = 1;
 	int file_data_length = 0;
 
 #ifdef APPLICATION_LAYER_DEBUG_MODE
@@ -197,11 +199,12 @@ int receive_data_packets(const int fd, char* file_name, size_t file_size)
 	fprintf(stderr, "\tfile_size=%zu\n", file_size);
 #endif
 
-	while (file_data_length < (int) file_size) {
+	while (received_data_bytes > 0) {
 
 		char *file_data;
 
-		if ((received_data_bytes = receive_data_packet(fd, &file_data)) < 0) {
+		if ((received_data_bytes = receive_data_packet(fd, &file_data,
+				file_data_length)) < 0) {
 			fprintf(stderr, "netlink: closing prematurely\n");
 			return llclose(fd);
 		}
@@ -218,13 +221,14 @@ int receive_data_packets(const int fd, char* file_name, size_t file_size)
 			return -1;
 		}
 
-		if (file_data_length > 0) {
+		if (received_data_bytes > 0) {
 			free(file_data);
 		}
 	}
 
 #ifdef APPLICATION_LAYER_DEBUG_MODE
-	fprintf(stderr,"file_data_length=%d\n", file_data_length);
+	fprintf(stderr,"receive_data_packets()\n");
+	fprintf(stderr,"\tfile_data_length=%d\n", file_data_length);
 #endif
 
 	return fclose(received_file);
@@ -294,7 +298,7 @@ int parse_data_packet(const int data_packet_length, byte *data_packet,
 	return data_size;
 }
 
-int receive_packet(const int fd, byte **packet)
+int llread(const int fd, byte **packet)
 {
 	struct connection* c = &g_connections[fd];
 
@@ -318,23 +322,41 @@ int receive_packet(const int fd, byte **packet)
 	return packet_length;
 }
 
-int receive_data_packet(const int fd, char **data)
+int receive_data_packet(const int fd, char **data, size_t received_file_bytes)
 {
 	byte *data_packet;
 	int data_packet_length = 0;
 
-	if ((data_packet_length = receive_packet(fd, &data_packet)) < 0) {
+	if ((data_packet_length = llread(fd, &data_packet)) < 0) {
 		return -1;
 	}
 
 #ifdef APPLICATION_LAYER_DEBUG_MODE
-	fprintf(stderr, "receive_data_packet()");
+	fprintf(stderr, "receive_data_packet()\n");
 	fprintf(stderr, "\treceived_data_bytes=%d\n", data_packet_length);
 #endif
 
 	byte control_field = data_packet[control_field_index];
 	if (control_field == control_field_data) {
+#ifdef APPLICATION_LAYER_DEBUG_MODE
+		fprintf(stderr, "\treceived data packet\n");
+#endif
+
 		return parse_data_packet(data_packet_length, data_packet, data);
+	} else if (control_field == control_field_end) {
+#ifdef APPLICATION_LAYER_DEBUG_MODE
+		fprintf(stderr, "\treceived end control packet\n");
+#endif
+		char* file_name;
+		size_t file_size;
+		parse_control_packet(data_packet_length, data_packet, &file_name,
+				&file_size);
+		if (received_file_bytes != file_size) {
+			fprintf(stderr, "Error: received %zu bytes from %zu file bytes\n",
+					file_size, received_file_bytes);
+			return -2;
+		}
+		return 0;
 	}
 
 	fprintf(stderr, "receive_data_packet(): bad control field value\n");
