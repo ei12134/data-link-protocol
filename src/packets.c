@@ -2,7 +2,6 @@
 #include <string.h>
 #include <time.h>
 #include <stdlib.h>
-#include <libgen.h>
 
 #include "data_link.h"
 #include "byte.h"
@@ -44,7 +43,7 @@ int send_file(char *port, struct file *file)
 		return llclose(fd);
 	}
 
-	// end session
+// end session
 	return llclose(fd);
 }
 
@@ -64,8 +63,10 @@ int send_control_packet(struct connection* connection, struct file *file,
 	fprintf(stderr, "\tcontrol_field=%d\n", control_field);
 	fprintf(stderr, "\tcontrol_packet_size=%zu\n", control_packet_size);
 	fprintf(stderr, "\tpacket_size=%zu\n", (connection->packet_size));
+	fprintf(stderr, "\tl1=%zu\n", sizeof(size_t));
 	fprintf(stderr, "\tfile_size=%zu\n", file->size);
 	fprintf(stderr, "\tname=%s\n", file->name);
+	fprintf(stderr, "\tl2=%zu\n", strlen(file->name));
 #endif
 
 	byte* control_packet = malloc(control_packet_size * sizeof(byte));
@@ -92,13 +93,15 @@ int send_control_packet(struct connection* connection, struct file *file,
 	control_packet[control_packet_l2_index] = v2_length;
 	memcpy(control_packet + control_packet_v2_index, (byte*) file->name,
 			v2_length);
+//	control_packet[control_packet_l2_index + v2_length] = '\0';
 
 	if (transmitter_write(connection, control_packet, control_packet_size)
 			< 0) {
+		free(control_packet);
 		return -1;
 	}
-	free(control_packet);
 
+	free(control_packet);
 	return 0;
 }
 
@@ -198,6 +201,7 @@ int receive_start_control_packet(const int fd, char **file_name,
 	int control_packet_length = 0;
 
 	if ((control_packet_length = llread(fd, &control_packet)) < 0) {
+		free(control_packet);
 		return -1;
 	}
 
@@ -206,7 +210,12 @@ int receive_start_control_packet(const int fd, char **file_name,
 		return parse_control_packet(control_packet_length, control_packet,
 				file_name, file_size);
 	}
+
+#ifdef APPLICATION_LAYER_DEBUG_MODE
 	fprintf(stderr, "receive_data_packet(): bad control field value\n");
+#endif
+
+	free(control_packet);
 	return -1;
 }
 
@@ -294,11 +303,8 @@ int parse_control_packet(const int control_packet_length, byte *control_packet,
 	}
 
 	size_t v2_length = *(control_packet + control_packet_l2_index);
-
-	char *file_path = malloc(v2_length * sizeof(char));
-	memcpy(file_path, (control_packet + control_packet_v2_index), v2_length);
-
-	*file_name = basename(file_path);
+	*file_name = malloc(v2_length * sizeof(char));
+	memcpy(*file_name, (control_packet + control_packet_v2_index), v2_length);
 
 #ifdef APPLICATION_LAYER_DEBUG_MODE
 	fprintf(stderr, "\tl1=%zu\n", v1_length);
@@ -394,12 +400,14 @@ int receive_data_packet(const int fd, char **data, size_t received_file_bytes,
 		if (received_file_bytes != file_size) {
 			fprintf(stderr, "Error: received %zu bytes from %zu file bytes\n",
 					file_size, received_file_bytes);
+			free(data_packet);
 			return -2;
 		}
 		return 0;
 	}
 
 	fprintf(stderr, "receive_data_packet(): bad control field value\n");
+	free(data_packet);
 	return -1;
 }
 

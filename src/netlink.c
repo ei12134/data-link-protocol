@@ -49,7 +49,7 @@ int parse_args(int argc, char **argv, int *is_transmitter)
 		else
 			*is_transmitter = 1;
 
-		if (read_file_from_stdin(argv[2], &file) < 0) {
+		if (read_file_from_stdin(&file) < 0) {
 			return -1;
 		}
 		return parse_serial_port_arg(2, argv);

@@ -11,9 +11,9 @@
 
 typedef unsigned char byte;
 
-//#define BAUDRATE B38400
+#define BAUDRATE B38400
 //#define BAUDRATE B9600
-#define BAUDRATE B1200
+//#define BAUDRATE B1200
 //#define BAUDRATE B300
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 

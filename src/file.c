@@ -2,34 +2,31 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <libgen.h>
 #include "file.h"
 
-#define BUFSIZE (8*1024*1024)
-
-int read_file_from_stdin(const char *name, struct file *f)
+int read_file_from_stdin(struct file *f)
 {
-	char *buffer = malloc(sizeof(char) * 10968);
-	char c;
+	char *buffer = malloc(sizeof(char) * sizeof(size_t));
+	char c = 0;
 	int size = 0;
-	do {
-		c = 0;
-		while (size < 10968 && (c = getc(stdin)) != EOF) {
-			buffer[size++] = c;
-		}
-	} while (c != EOF);
 
-//	#ifdef APPLICATION_PORT_DEBUG_MODE
-//	fprintf(stderr, "name=%s\n\nsize=%d\n\ndata=%s\n", name, size,
-//			buffer);
-//	#endif
+	while (size < sizeof(size_t) && (c = fgetc(stdin)) != EOF) {
+		buffer[size++] = c;
+	}
 
-	f->name = name;
+#ifdef APPLICATION_PORT_DEBUG_MODE
+	fprintf(stderr, "read_file_from_stdin()\nname=%s\n\tsize=%d\n\tndata=%s\n", name, size,
+			buffer);
+#endif
+
+	f->name = "stdin.out";
 	f->size = size;
 	f->data = buffer;
 	return 0;
 }
 
-int read_file_from_disk(const char *name, struct file *f)
+int read_file_from_disk(char *name, struct file *f)
 {
 	size_t length;
 	FILE *file = fopen(name, "r");
@@ -42,7 +39,7 @@ int read_file_from_disk(const char *name, struct file *f)
 			fseek(file, 0, SEEK_SET);
 			fread(buffer, 1, length, file);
 			fclose(file);
-			f->name = name;
+			f->name = basename(name);
 			f->size = length;
 			f->data = buffer;
 			return 0;

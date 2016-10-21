@@ -9,8 +9,7 @@ struct file {
 	char* data;
 };
 
-int read_file_from_stdin(const char *name, struct file *f);
-
-int read_file_from_disk(const char *name, struct file *f);
+int read_file_from_stdin(struct file *f);
+int read_file_from_disk(char *name, struct file *f);
 
 #endif // FILE_H_
