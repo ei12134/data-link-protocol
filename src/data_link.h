@@ -3,6 +3,7 @@
 
 /* Settings */
 #define LL_MAX_FRAME_SZ 4096
+//#define LL_MAX_FRAME_SZ 8192
 /* ---------------- */
 
 // - 2 flags, 3-byte header, 1 data bcc

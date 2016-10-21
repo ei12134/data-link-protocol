@@ -12,7 +12,8 @@
 typedef unsigned char byte;
 
 //#define BAUDRATE B38400
-#define BAUDRATE B300
+#define BAUDRATE B9600
+//#define BAUDRATE B300
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 
 struct termios g_oldtio;
@@ -62,10 +63,13 @@ int serial_port_open(const char *dev_name, const int micro_timeout)
 	bzero(&newtio, sizeof(newtio)); /* clear struct for new port settings */
 	newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
 	//newtio.c_iflag = IGNPAR | ICRNL;
-//	newtio.c_iflag = IGNPAR;
-//	newtio.c_oflag = OPOST; // 0?
 	newtio.c_iflag = IGNPAR;
-	newtio.c_oflag = 0;
+	newtio.c_oflag = OPOST;
+	newtio.c_oflag &= ~OCRNL;
+//	newtio.c_oflag = 0;
+
+	/* set input mode (non-canonical, no echo,...) */
+	//newtio.c_lflag &= ~(ICANON | ECHO);
 	newtio.c_lflag = 0;
 
 	/* 0 => inter-character timer unused */
@@ -151,7 +155,7 @@ int serial_port_read(int fd, byte *data, byte delim, int maxc)
 			break;
 		} else if (ret < 0 && errno == EINTR) { // interrupted, possibly by an alarm
 #ifdef SERIAL_PORT_DEBUG_MODE
-			fprintf(stderr,"serial_port_read(): received interrupt\n");
+		fprintf(stderr,"serial_port_read(): received interrupt\n");
 #endif
 			return 0;
 		} else if (ret < 0) {
