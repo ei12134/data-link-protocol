@@ -10,20 +10,18 @@
 #define TRUE 1
 #define FALSE 0
 
-struct file file;
+struct file file_to_send;
 
-// Print how the arguments must be
 void print_help(char **argv)
 {
 	fprintf(stderr, "Usage: %s [OPTIONS] <serial port>\n", argv[0]);
 	fprintf(stderr, "\n Program options:\n");
-	fprintf(stderr, "  -t\t\t\ttransmit data over the serial port\n");
+	fprintf(stderr, "  -t <FILEPATH>\t\ttransmit data over the serial port\n");
 	fprintf(stderr, "  -b <BAUDRATE>\t\tbaudrate of the serial port\n");
 	fprintf(stderr, "  -i <FRAMESIZE>\tmaximum unstuffed frame size\n");
 	fprintf(stderr, "  -r <RETRY>\t\tnumber of retry attempts\n");
 }
 
-// Verifies serial port argument
 int parse_serial_port_arg(int index, char **argv)
 {
 	if ((strcmp("/dev/ttyS0", argv[index]) != 0)
@@ -34,7 +32,6 @@ int parse_serial_port_arg(int index, char **argv)
 	return index;
 }
 
-// Verifies arguments
 int parse_args(int argc, char **argv, int *is_transmitter)
 {
 	if (argc < 2)
@@ -49,7 +46,7 @@ int parse_args(int argc, char **argv, int *is_transmitter)
 		else
 			*is_transmitter = 1;
 
-		if (read_file_from_stdin(&file) < 0) {
+		if (read_file_from_stdin(&file_to_send) < 0) {
 			return -1;
 		}
 		return parse_serial_port_arg(2, argv);
@@ -62,7 +59,7 @@ int parse_args(int argc, char **argv, int *is_transmitter)
 			*is_transmitter = 1;
 		}
 
-		if (read_file_from_disk(argv[2], &file) < 0) {
+		if (read_file_from_disk(argv[2], &file_to_send) < 0) {
 			return -1;
 		}
 		return parse_serial_port_arg(3, argv);
@@ -72,7 +69,6 @@ int parse_args(int argc, char **argv, int *is_transmitter)
 
 int main(int argc, char **argv)
 {
-	// Verifies arguments
 	int port_index = -1;
 	int is_transmitter = 0;
 
@@ -82,8 +78,8 @@ int main(int argc, char **argv)
 	}
 
 	if (is_transmitter) {
-		fprintf(stderr, "netlink: transmitting %s\n", file.name);
-		return send_file(argv[port_index], &file);
+		fprintf(stderr, "netlink: transmitting %s\n", file_to_send.name);
+		return send_file(argv[port_index], &file_to_send, 5);
 	} else {
 		fprintf(stderr, "netlink: receiving file\n");
 		return receive_file(argv[port_index], 5);
