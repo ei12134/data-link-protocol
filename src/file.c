@@ -2,27 +2,34 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <stdint.h>
 #include <libgen.h>
+#include <limits.h>
 #include "file.h"
 
 int read_file_from_stdin(struct file *f)
 {
-	char *buffer = malloc(sizeof(char) * sizeof(size_t));
-	char c = 0;
-	int size = 0;
-
-	while (size < sizeof(size_t) && (c = fgetc(stdin)) != EOF) {
-		buffer[size++] = c;
+	char *buffer;
+	if ((buffer = malloc(sizeof(char) * INT_MAX)) == NULL ) {
+		perror("read_file_from_stdin() buffer malloc error");
+		exit(EXIT_FAILURE);
 	}
 
-#ifdef APPLICATION_PORT_DEBUG_MODE
-	fprintf(stderr, "read_file_from_stdin()\nname=%s\n\tsize=%d\n\tndata=%s\n", name, size,
+	size_t size = 0;
+
+	if ((size = fread(buffer, sizeof(char), INT_MAX, stdin)) < 0) {
+		fprintf(stderr, "Error: reading from the stdin.\n");
+	}
+
+#ifdef APPLICATION_LAYER_DEBUG_MODE
+	fprintf(stderr, "read_file_from_stdin()\n\tname=%s\n\tsize=%zu\n\tdata=%s\n", "stdin.out", size,
 			buffer);
 #endif
 
-	f->name = "stdin.out";
+	f->name = "output";
 	f->size = size;
 	f->data = buffer;
+
 	return 0;
 }
 
