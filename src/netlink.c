@@ -82,6 +82,6 @@ int main(int argc, char **argv)
 		return send_file(argv[i], &file);
 	} else {
 		fprintf(stderr, "netlink: receiving...\n");
-		return receive_file(argv[i]);
+		return receive_file(argv[i], 5);
 	}
 }

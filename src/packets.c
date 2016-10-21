@@ -2,6 +2,8 @@
 #include <string.h>
 #include <time.h>
 #include <stdlib.h>
+#include <libgen.h>
+
 #include "data_link.h"
 #include "byte.h"
 #include "packets.h"
@@ -81,7 +83,7 @@ int send_control_packet(struct connection* connection, struct file *file,
 	memcpy(control_packet + control_packet_v1_index, &(file->size), v1_length);
 
 	// TLV (file name)
-	size_t v2_length = (strlen(file->name) + 1);
+	size_t v2_length = strlen(file->name);
 	size_t control_packet_t2_index = 4 + v1_length;
 	size_t control_packet_l2_index = control_packet_t2_index + 1;
 	size_t control_packet_v2_index = control_packet_l2_index + 1;
@@ -146,23 +148,44 @@ int send_data_packets(struct connection* connection, struct file* file)
 	return 0;
 }
 
-int receive_file(char *port)
+int receive_file(char *port, int receive_attempts)
 {
 	int fd = llopen(port, 0);
 
 	char *file_name;
 	size_t file_size;
-	char* tmp_file_name = "pinguim.gif";
 
 	if (receive_start_control_packet(fd, &file_name, &file_size) < 0) {
+#ifdef APPLICATION_LAYER_DEBUG_MODE
 		fprintf(stderr,
-				"receive_start_control_packet() returned an error code");
-		return llclose(fd);
+				"receive_start_control_packet() returned an error code\n");
+		fprintf(stderr, "\tattempts left %d failed\n", receive_attempts);
+#endif
+		if (receive_attempts > 0) {
+			if (llclose(fd) == 0) {
+				return receive_file(port, --receive_attempts);
+			}
+		} else {
+			fprintf(stderr,
+					"receive_start_control_packet() maximum attempts reached\n");
+			return llclose(fd);
+		}
 	}
 
-	if (receive_data_packets(fd, tmp_file_name, file_size) < 0) {
-		fprintf(stderr, "receive_data_packets() returned an error code");
-		return llclose(fd);
+	if (receive_data_packets(fd, file_name, file_size) < 0) {
+#ifdef APPLICATION_LAYER_DEBUG_MODE
+		fprintf(stderr, "receive_data_packets() returned an error code\n");
+		fprintf(stderr, "\tattempts left %d failed\n", receive_attempts);
+#endif
+		if (receive_attempts > 0) {
+			if (llclose(fd) == 0) {
+				return receive_file(port, --receive_attempts);
+			}
+		} else {
+			fprintf(stderr,
+					"receive_start_control_packet() maximum attempts reached\n");
+			return llclose(fd);
+		}
 	}
 
 	return llclose(fd);
@@ -237,7 +260,7 @@ int receive_data_packets(const int fd, char* file_name, size_t file_size)
 int parse_control_packet(const int control_packet_length, byte *control_packet,
 		char **file_name, size_t *file_size)
 {
-	// TLV (file size)
+// TLV (file size)
 	if (control_packet[control_packet_t1_index]
 			!= control_packet_tlv_type_filesize) {
 		fprintf(stderr, "parse_control_packet(): bad type 1");
@@ -255,7 +278,7 @@ int parse_control_packet(const int control_packet_length, byte *control_packet,
 			v1_length);
 	*file_size = *file_size_tmp;
 
-	// TLV (file name)
+// TLV (file name)
 	size_t control_packet_t2_index = control_packet_v1_index + v1_length + 1;
 	size_t control_packet_l2_index = control_packet_t2_index + 1;
 	size_t control_packet_v2_index = control_packet_l2_index + 1;
@@ -268,8 +291,11 @@ int parse_control_packet(const int control_packet_length, byte *control_packet,
 	}
 
 	size_t v2_length = *(control_packet + control_packet_l2_index);
-	*file_name = malloc(v2_length * sizeof(char));
-	memcpy(*file_name, (control_packet + control_packet_v2_index), v2_length);
+
+	char *file_path = malloc(v2_length * sizeof(char));
+	memcpy(file_path, (control_packet + control_packet_v2_index), v2_length);
+
+	*file_name = basename(file_path);
 
 #ifdef APPLICATION_LAYER_DEBUG_MODE
 	fprintf(stderr, "\tl1=%zu\n", v1_length);
@@ -302,7 +328,7 @@ int llread(const int fd, byte **packet)
 {
 	struct connection* c = &g_connections[fd];
 
-	// maximum size of a packet
+// maximum size of a packet
 	size_t packet_size = c->packet_size * sizeof(byte);
 	*packet = malloc(packet_size);
 

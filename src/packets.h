@@ -37,7 +37,7 @@ int send_packet(const int fd, const char *buffer, int length);
 int parse_data_packet(const int data_packet_length, byte *data_packet,
 		char **data);
 
-int receive_file(char *port);
+int receive_file(char *port, int receive_attempts);
 int receive_start_control_packet(const int fd, char **file_name,
 		size_t *file_size);
 int llread(const int fd, byte **packet);
