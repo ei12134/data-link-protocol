@@ -5,23 +5,24 @@
 #include <unistd.h>
 
 #include "packets.h"
+#include "file.h"
 
-#define TRUE 1
-#define FALSE 0
+struct file file_to_send;
+size_t real_file_bytes = 0;
+size_t received_file_bytes = 0;
+size_t lost_packets = 0;
+size_t duplicated_packets = 0;
 
-int TRANSMITTER = FALSE;
-#define BUFSIZE (8*1024*1024)
-#define OUTPUT_TO_STDOUT 1
-
-// Print how the arguments must be
-void print_help(char **argv)
+void help(char **argv)
 {
-	fprintf(stderr, "Usage: %s [OPTION] <serial port>\n", argv[0]);
+	fprintf(stderr, "Usage: %s [OPTIONS] <serial port>\n", argv[0]);
 	fprintf(stderr, "\n Program options:\n");
-	fprintf(stderr, "  -t         transmit data over the serial port\n");
+	fprintf(stderr, "  -t <FILEPATH>\t\ttransmit data over the serial port\n");
+	fprintf(stderr, "  -b <BAUDRATE>\t\tbaudrate of the serial port\n");
+	fprintf(stderr, "  -i <FRAMESIZE>\tmaximum unstuffed frame size\n");
+	fprintf(stderr, "  -r <RETRY>\t\tnumber of retry attempts\n");
 }
 
-// Verifies serial port argument
 int parse_serial_port_arg(int index, char **argv)
 {
 	if ((strcmp("/dev/ttyS0", argv[index]) != 0)
@@ -32,8 +33,7 @@ int parse_serial_port_arg(int index, char **argv)
 	return index;
 }
 
-// Verifies arguments
-int parse_args(int argc, char **argv)
+int parse_args(int argc, char **argv, int *is_transmitter)
 {
 	if (argc < 2)
 		return -1;
@@ -45,68 +45,57 @@ int parse_args(int argc, char **argv)
 		if ((strcmp("-t", argv[1]) != 0))
 			return -2;
 		else
-			TRANSMITTER = TRUE;
+			*is_transmitter = 1;
 
+		if (read_file_from_stdin(&file_to_send) < 0) {
+			return -1;
+		}
 		return parse_serial_port_arg(2, argv);
+	}
+
+	if (argc == 4) {
+		if ((strcmp("-t", argv[1]) != 0))
+			return -2;
+		else {
+			*is_transmitter = 1;
+		}
+
+		if (read_file_from_disk(argv[2], &file_to_send) < 0) {
+			return -1;
+		}
+		return parse_serial_port_arg(3, argv);
 	} else
 		return -1;
 }
 
+void receiver_stats()
+{
+	fprintf(stdout, "Receiver statistics\n");
+	fprintf(stdout, "\treceived file bytes/file bytes: %zu/%zu\n",
+			received_file_bytes, real_file_bytes);
+	fprintf(stdout, "\tlost packets: %zu\n", lost_packets);
+	fprintf(stdout, "\tduplicated packets: %zu\n", duplicated_packets);
+}
+
 int main(int argc, char **argv)
 {
-	// Verifies arguments
-	int i = -1;
-	if ((i = parse_args(argc, argv)) < 0) {
-		print_help(argv);
-		exit(1);
+	int port_index = -1;
+	int is_transmitter = 0;
+	int exit_code = 0;
+
+	if ((port_index = parse_args(argc, argv, &is_transmitter)) < 0) {
+		help(argv);
+		exit(EXIT_FAILURE);
 	}
 
-	char *port = argv[i];
-	int fd;
-	if ((fd = llopen(port, TRANSMITTER)) < 0) {
-		return 1;
-	}
-	char *buffer = malloc(sizeof(char) * BUFSIZE);
-
-	if (TRANSMITTER) {
-		fprintf(stderr, "netlink: transmitting...\n");
-		int c;
-		do {
-			int i = 0;
-			while (i < BUFSIZE && (c = getc(stdin)) != EOF) {
-				buffer[i++] = c;
-			}
-			if (llwrite(fd, buffer, i) < 0) {
-				fprintf(stderr, "netlink: closing prematurely\n");
-				llclose(fd);
-				return 1;
-			}
-		} while (c != EOF);
-		return llclose(fd);
+	if (is_transmitter) {
+		fprintf(stderr, "netlink: transmitting %s\n", file_to_send.name);
+		exit_code = send_file(argv[port_index], &file_to_send, 5);
 	} else {
-		fprintf(stderr, "netlink: receiving...\n");
-
-		FILE* outfile = fopen("imagem.gif", "w");
-		int num_bytes;
-		int ret;
-		do {
-		    if ((num_bytes = llread(fd, buffer, BUFSIZE)) < 0) {
-                        fprintf(stderr, "netlink: closing prematurely\n");
-		        ret = -1;
-                        llclose(fd);
-		    }
-		    if (OUTPUT_TO_STDOUT) { printf("%.*s", num_bytes, buffer); }
-		    if ((ret = fwrite(buffer,sizeof(char),num_bytes,outfile)) < 0) {
-			fprintf(stderr,"netlink: file write error\n");
-                        break;
-		    }
-		} while (num_bytes > 0);
-
-                printf("debug: num_bytes=%d\n",num_bytes);
-
-		if (fclose(outfile) < 1) { ret = -1; }
-		free(buffer);
-
-		return ret;
+		fprintf(stderr, "netlink: receiving file\n");
+		exit_code = receive_file(argv[port_index], 5);
+		receiver_stats();
 	}
+
+	exit(exit_code);
 }

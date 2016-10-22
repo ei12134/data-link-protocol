@@ -1,7 +1,8 @@
 CC = gcc
-CFLAGS = -Wall -std=c99
+CFLAGS = -Wall -std=c99 -g
 #CFLAGS += -DSERIAL_PORT_DEBUG_MODE
-CFLAGS += -DDATA_LINK_DEBUG_MODE
+#CFLAGS += -DDATA_LINK_DEBUG_MODE
+CFLAGS += -DDATA_LINK_DEBUG_MODE -DAPPLICATION_LAYER_DEBUG_MODE
 
 PROG = netlink serial_port_test writenoncanonical noncanonical writecanonical
 
@@ -19,7 +20,7 @@ serial_port_test: serial_port_test.o serial_port.o
 data_link_test: data_link_test.o data_link_io.o serial_port.o data_link.o
 	cc -o $@ $F $^
 
-netlink: netlink.o packets.o data_link.o data_link_io.o serial_port.o
+netlink: netlink.o packets.o data_link.o data_link_io.o serial_port.o file.o
 	cc -o $@ $F $^
 
 serial_port.o serial_port_test.o data_link_io.o data_link.o data_link_test.o: serial_port.h
