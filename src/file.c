@@ -12,13 +12,14 @@ int read_file_from_stdin(struct file *f)
 	char *buffer;
 	if ((buffer = malloc(sizeof(char) * INT_MAX)) == NULL ) {
 		perror("read_file_from_stdin() buffer malloc error");
-		exit(EXIT_FAILURE);
+		return -1;
 	}
 
 	size_t size = 0;
 
 	if ((size = fread(buffer, sizeof(char), INT_MAX, stdin)) < 0) {
-		fprintf(stderr, "Error: reading from the stdin.\n");
+		fprintf(stderr, "ERROR: reading from the stdin.\n");
+		return -1;
 	}
 
 #ifdef APPLICATION_LAYER_DEBUG_MODE

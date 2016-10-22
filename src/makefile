@@ -2,9 +2,9 @@ CC = gcc
 CFLAGS = -Wall -std=c99 -g
 #CFLAGS += -DSERIAL_PORT_DEBUG_MODE
 #CFLAGS += -DDATA_LINK_DEBUG_MODE
-CFLAGS += -DDATA_LINK_DEBUG_MODE -DAPPLICATION_LAYER_DEBUG_MODE
+CFLAGS += -DDATA_LINK_DEBUG_MODE -DAPPLICATION_LAYER_DEBUG_MODE -DNETLINK_DEBUG_MODE
 
-PROG = netlink serial_port_test writenoncanonical noncanonical writecanonical
+PROG = netlink# serial_port_test writenoncanonical noncanonical writecanonical
 
 all: $(PROG)
 

@@ -9,23 +9,10 @@
 #include <fcntl.h>
 #include <errno.h>
 
-typedef unsigned char byte;
+#include "netlink.h"
+#include "serial_port.h"
 
-//#define BAUDRATE  B50
-//#define BAUDRATE  B75
-//#define BAUDRATE  B110
-//#define BAUDRATE  B134
-//#define BAUDRATE  B150
-//#define BAUDRATE  B200
-//#define BAUDRATE  B300
-//#define BAUDRATE  B600
-//#define BAUDRATE  B1200
-//#define BAUDRATE  B1800
-//#define BAUDRATE  B2400
-//#define BAUDRATE  B4800
-//#define BAUDRATE  B9600
-//#define BAUDRATE  B19200
-#define BAUDRATE  B38400
+typedef unsigned char byte;
 
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 
@@ -48,7 +35,6 @@ int serial_port_open(const char *dev_name, const int micro_timeout)
 #ifdef SERIAL_PORT_DEBUG_MODE
 	fprintf(stderr,"serial_port_open(): entering function; dev = %s\n, timeout = \
             %d\n",dev_name,micro_timeout);
-	<<<<<<< HEAD
 #endif
 
 	/*
@@ -74,8 +60,9 @@ int serial_port_open(const char *dev_name, const int micro_timeout)
 		perror("tcgetattr");
 		return -1;
 	}
+
 	bzero(&newtio, sizeof(newtio)); /* clear struct for new port settings */
-	newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
+	newtio.c_cflag = serial_port_baudrate | CS8 | CLOCAL | CREAD;
 	newtio.c_iflag = IGNPAR;
 	newtio.c_oflag = 0;
 	newtio.c_lflag = 0;

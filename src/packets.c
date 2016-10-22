@@ -117,7 +117,7 @@ int send_control_packet(struct connection* connection, struct file *file,
 	}
 
 #ifdef APPLICATION_LAYER_DEBUG_MODE
-	fprintf(stderr, "  send_control_packet()\n");
+	fprintf(stderr, "send_control_packet()\n");
 	fprintf(stderr, "\tcontrol_field=%d\n", control_field);
 	fprintf(stderr, "\tcontrol_packet_size=%zu\n", control_packet_size);
 	fprintf(stderr, "\tpacket_size=%zu\n", (connection->packet_size));
