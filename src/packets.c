@@ -455,10 +455,12 @@ int parse_data_packet(const int data_packet_length, byte *data_packet,
 		fprintf(stderr, "bad packet sequence number: (received %zu) <-> (expected %zu)\n", received_sequence_number, expected_sequence_number);
 #endif
 		if (received_sequence_number > expected_sequence_number) {
-			lost_packets++;
+
 			while (*sequence_number % sequence_number_modulus
-					!= received_sequence_number)
+					!= received_sequence_number) {
 				(*sequence_number)++;
+				lost_packets++;
+			}
 		} else {
 			duplicated_packets++;
 			*sequence_number = expected_sequence_number;
