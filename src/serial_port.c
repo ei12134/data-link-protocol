@@ -48,6 +48,7 @@ int serial_port_open(const char *dev_name, const int micro_timeout)
 #ifdef SERIAL_PORT_DEBUG_MODE
 	fprintf(stderr,"serial_port_open(): entering function; dev = %s\n, timeout = \
             %d\n",dev_name,micro_timeout);
+	<<<<<<< HEAD
 #endif
 
 	/*

@@ -96,6 +96,12 @@ int transmitter_write(struct connection* conn, byte* data_packet, size_t size)
 	struct frame out_frame = { .address = A, .control = data_control_byte(
 			conn->frame_number), .size = size, .data = data_packet };
 
+	printf(" ###################################### \n");
+	printf("\n");
+	printf(" BEGIN TRANSMIT %x\n", out_frame.control);
+	printf("\n");
+	printf(" ###################################### \n");
+
 	byte success_rep = data_reply_byte(conn->frame_number, TRUE);
 	byte rej_rep = data_reply_byte(conn->frame_number, FALSE);
 
@@ -208,6 +214,12 @@ int receiver_read(struct connection* conn, byte *begin, size_t max_data_size,
 		in.data = p;
 		in.max_data_size = end - p;
 		Return_e ret = f_receive_frame(conn->fd, &in, 0);
+
+		printf(" ###################################### \n");
+		printf("\n");
+		printf(" BEGIN RECEIVE %x\n", in.control);
+		printf("\n");
+		printf(" ###################################### \n");
 
 		if (ret == ERROR_CODE) {
 			return -1;
