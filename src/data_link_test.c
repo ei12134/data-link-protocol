@@ -39,7 +39,7 @@ int are_frames_equal(struct frame f1, struct frame f2)
 }
 
 // Print how the arguments must be
-void print_help(char **argv)
+void help(char **argv)
 {
 	printf("Usage: %s [OPTION] <serial port>\n", argv[0]);
 	printf("\n Program options:\n");
@@ -337,7 +337,7 @@ int main(int argc, char *argv[])
 {
 	int i;
 	if ((i = parse_args(argc, argv)) < 0) {
-		print_help(argv);
+		help(argv);
 		printf("line: %d\n", __LINE__);
 		return 1;
 	}

@@ -16,6 +16,11 @@
 #define NUM_RETRANSMISSIONS 3
 #define CLOSE_WAIT_TIME 3
 
+extern size_t real_file_bytes;
+extern size_t received_file_bytes;
+extern size_t lost_packets;
+extern size_t duplicated_packets;
+
 struct connection g_connections[MAX_FD];
 
 int send_file(char *port, struct file *file, int max_send_attempts)
@@ -190,7 +195,7 @@ int send_data_packets(struct connection* connection, struct file* file,
 		data_packet[control_field_index] = control_field_data;
 		data_packet[data_packet_sequence_number_index] = *sequence_number
 				% sequence_number_modulus;
-		*sequence_number = (*sequence_number % sequence_number_modulus) + 1;
+		(*sequence_number)++;
 		data_packet[data_packet_l2_index] = (data_bytes_to_send / 256);
 		data_packet[data_packet_l1_index] = (data_bytes_to_send % 256);
 
@@ -206,6 +211,7 @@ int send_data_packets(struct connection* connection, struct file* file,
 		}
 
 		if (transmitter_write(connection, data_packet, data_packet_size) < 0) {
+			free(data_packet);
 			return -1;
 		}
 
@@ -245,6 +251,7 @@ int receive_file(char *port, int max_receive_attempts)
 			} else {
 				state = RCV_DATA_PACKETS;
 				attempts_left = max_receive_attempts;
+				real_file_bytes = file_size;
 			}
 			break;
 
@@ -303,8 +310,7 @@ int receive_data_packets(const int fd, char* file_name, size_t file_size,
 		int attempts_left)
 {
 	FILE* received_file = fopen(file_name, "w");
-	int received_data_bytes = 1;
-	int file_data_length = 0;
+	int receive_return_value = 1;
 	size_t sequence_number = 0;
 
 #ifdef APPLICATION_LAYER_DEBUG_MODE
@@ -313,34 +319,34 @@ int receive_data_packets(const int fd, char* file_name, size_t file_size,
 	fprintf(stderr, "\tfile_size=%zu\n", file_size);
 #endif
 
-	while (received_data_bytes > 0 && attempts_left > 0) {
+	while (receive_return_value > 0 && attempts_left > 0) {
 
 		char *file_data;
 
-		if ((received_data_bytes = receive_data_packet(fd, &file_data,
-				file_data_length, sequence_number)) < 0) {
+		if ((receive_return_value = receive_data_packet(fd, &file_data,
+				received_file_bytes, &sequence_number)) < 0) {
 #ifdef APPLICATION_LAYER_DEBUG_MODE
 			fprintf(stderr, "receive_data_packet() returned an error code\n");
 			fprintf(stderr, "\t%d attempts left\n", attempts_left - 1);
 #endif
 			retry(&attempts_left);
-			received_data_bytes = 1;
+			receive_return_value = 1;
 		} else {
-			sequence_number = (sequence_number % sequence_number_modulus) + 1;
-			file_data_length += received_data_bytes;
+			sequence_number++;
+			received_file_bytes += receive_return_value;
 
 #ifdef APPLICATION_LAYER_DEBUG_MODE
-			fprintf(stderr, "\treceived_data_bytes=%d\n", received_data_bytes);
-			fprintf(stderr, "\tfile_data_length=%d\n", file_data_length);
+			fprintf(stderr, "\treceive_return_value=%d\n", receive_return_value);
+			fprintf(stderr, "\treceived_file_bytes=%zu\n", received_file_bytes);
 #endif
 
-			if ((fwrite(file_data, sizeof(char), received_data_bytes,
+			if ((fwrite(file_data, sizeof(char), receive_return_value,
 					received_file)) < 0) {
 				fprintf(stderr, "Error: file write error\n");
 				return -1;
 			}
 
-			if (received_data_bytes > 0) {
+			if (receive_return_value > 0) {
 				free(file_data);
 			}
 		}
@@ -348,7 +354,7 @@ int receive_data_packets(const int fd, char* file_name, size_t file_size,
 
 #ifdef APPLICATION_LAYER_DEBUG_MODE
 	fprintf(stderr,"receive_data_packets()\n");
-	fprintf(stderr,"\tfile_data_length=%d\n", file_data_length);
+	fprintf(stderr,"\tfile_data_length=%zu\n", received_file_bytes);
 #endif
 
 	if (attempts_left <= 0) {
@@ -419,7 +425,7 @@ int parse_control_packet(const int control_packet_length, byte *control_packet,
 }
 
 int parse_data_packet(const int data_packet_length, byte *data_packet,
-		char **data, const size_t sequence_number)
+		char **data, size_t* sequence_number)
 {
 	int data_size = data_packet[data_packet_l2_index] * 256
 			+ data_packet[data_packet_l1_index];
@@ -438,14 +444,27 @@ int parse_data_packet(const int data_packet_length, byte *data_packet,
 
 	memcpy(*data, (data_packet + data_packet_header_size * sizeof(byte)),
 			data_size);
-	if (data_packet[data_packet_sequence_number_index]
-			!= (sequence_number % sequence_number_modulus)) {
+
+	size_t received_sequence_number =
+			data_packet[data_packet_sequence_number_index];
+	size_t expected_sequence_number = *sequence_number
+			% sequence_number_modulus;
+	if (received_sequence_number != expected_sequence_number) {
 #ifdef APPLICATION_LAYER_DEBUG_MODE
-		fprintf(stderr, "bad packet sequence number: (received %d) <-> (expected %zu)\n", data_packet[data_packet_sequence_number_index], (sequence_number % sequence_number_modulus));
+		fprintf(stderr, "bad packet sequence number: (received %zu) <-> (expected %zu)\n", received_sequence_number, expected_sequence_number);
 #endif
-		free(data_packet);
-		free(*data);
-		return -1;
+		if (received_sequence_number > expected_sequence_number) {
+			lost_packets++;
+			while (*sequence_number % sequence_number_modulus
+					!= received_sequence_number)
+				(*sequence_number)++;
+		} else {
+			duplicated_packets++;
+			*sequence_number = expected_sequence_number;
+		}
+		//		free(data_packet);
+//		free(*data);
+//		return -1;
 	}
 	free(data_packet);
 	return data_size;
@@ -481,7 +500,7 @@ int llread(const int fd, byte **packet)
 }
 
 int receive_data_packet(const int fd, char **file_data,
-		size_t received_file_bytes, const size_t sequence_number)
+		size_t received_file_bytes, size_t* sequence_number)
 {
 	byte *data_packet;
 	int data_packet_length = 0;
@@ -511,12 +530,6 @@ int receive_data_packet(const int fd, char **file_data,
 		size_t file_size;
 		if (parse_control_packet(data_packet_length, data_packet, &file_name,
 				&file_size) == 0) {
-			if (received_file_bytes != file_size) {
-				fprintf(stderr,
-						"ERROR: (received %zu bytes) <-> (expected %zu file bytes)\n",
-						file_size, received_file_bytes);
-				return -2;
-			}
 			return 0;
 		} else {
 			return -1;

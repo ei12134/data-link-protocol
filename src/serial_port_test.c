@@ -17,7 +17,7 @@
 int is_transmitter = FALSE;
 
 // Print how the arguments must be
-void print_help(char **argv)
+void help(char **argv)
 {
 	printf("Usage: %s [OPTION] <serial port>\n", argv[0]);
 	printf("\n Program options:\n");
@@ -119,7 +119,7 @@ int test1(int argc,char **argv)
      // Verifies arguments
      int i = -1;
      if ( (i = parse_args(argc, argv)) < 0 ) {
-     	print_help(argv);
+     	help(argv);
              printf("line: %d\n",__LINE__);
      	return 1;
      }
@@ -147,7 +147,7 @@ int test2(int argc,char **argv)
     // Verifies arguments
     int i = -1;
     if ((i = parse_args(argc, argv)) < 0 ) {
-        print_help(argv);
+        help(argv);
         printf("line: %d\n",__LINE__);
        return 1;
     }
@@ -235,7 +235,7 @@ int test3(int argc,char **argv)
     // Verifies arguments
     int i = -1;
     if ( (i = parse_args(argc, argv)) < 0 ) {
-        print_help(argv);
+        help(argv);
         printf("line: %d\n",__LINE__);
         return 1;
     }

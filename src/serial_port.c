@@ -11,10 +11,22 @@
 
 typedef unsigned char byte;
 
-//#define BAUDRATE B38400
-#define BAUDRATE B9600
-//#define BAUDRATE B1200
-//#define BAUDRATE B300
+//#define BAUDRATE  B50
+//#define BAUDRATE  B75
+//#define BAUDRATE  B110
+//#define BAUDRATE  B134
+//#define BAUDRATE  B150
+//#define BAUDRATE  B200
+//#define BAUDRATE  B300
+//#define BAUDRATE  B600
+//#define BAUDRATE  B1200
+//#define BAUDRATE  B1800
+//#define BAUDRATE  B2400
+//#define BAUDRATE  B4800
+#define BAUDRATE  B9600
+//#define BAUDRATE  B19200
+//#define BAUDRATE  B38400
+
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 
 struct termios g_oldtio;
@@ -63,14 +75,8 @@ int serial_port_open(const char *dev_name, const int micro_timeout)
 	}
 	bzero(&newtio, sizeof(newtio)); /* clear struct for new port settings */
 	newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
-	//newtio.c_iflag = IGNPAR | ICRNL;
 	newtio.c_iflag = IGNPAR;
-	newtio.c_oflag = OPOST;
-	newtio.c_oflag &= ~OCRNL;
-//	newtio.c_oflag = 0;
-
-	/* set input mode (non-canonical, no echo,...) */
-	//newtio.c_lflag &= ~(ICANON | ECHO);
+	newtio.c_oflag = 0;
 	newtio.c_lflag = 0;
 
 	/* 0 => inter-character timer unused */

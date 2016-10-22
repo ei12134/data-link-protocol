@@ -59,10 +59,10 @@ int receive_data_packets(const int fd, char* file_name, size_t file_size,
 int parse_control_packet(const int control_packet_length, byte *control_packet,
 		char **file_name, size_t *file_size);
 int parse_data_packet(const int data_packet_length, byte *data_packet,
-		char **data, const size_t sequence_number);
+		char **data, size_t* sequence_number);
 
 int receive_data_packet(const int fd, char **data, size_t received_file_bytes,
-		const size_t sequence_number);
+		size_t* sequence_number);
 int llopen(char *port, int transmitter);
 int connect(char *port, int transmitter);
 int llclose(const int fd);
