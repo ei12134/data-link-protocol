@@ -10,9 +10,10 @@
 #include "packets.h"
 #include "file.h"
 #include "netlink.h"
+#include "serial_port.h"
 
 struct file file_to_send;
-int serial_port_baudrate = B19200;
+
 size_t real_file_bytes = 0;
 size_t received_file_bytes = 0;
 size_t lost_packets = 0;
@@ -90,7 +91,7 @@ int parse_baudrate_arg(int baurdate_index, char **argv)
 	return -1;
 }
 
-void parse_flags(int* t_index, int* i_index, int* b_index, int* f_index,
+int parse_flags(int* t_index, int* i_index, int* b_index, int* f_index,
 		int* r_index, int argc, char **argv)
 {
 	for (size_t i = 0; i < (argc - 1); i++) {
@@ -104,6 +105,8 @@ void parse_flags(int* t_index, int* i_index, int* b_index, int* f_index,
 			*f_index = i;
 		} else if ((strcmp("-r", argv[1]) == 0)) {
 			*r_index = i;
+		} else if ((argv[i][0] == '-')) {
+			return -1;
 		}
 	}
 #ifdef NETLINK_DEBUG_MODE
@@ -111,6 +114,7 @@ void parse_flags(int* t_index, int* i_index, int* b_index, int* f_index,
 	fprintf(stderr,"\t-t:%d   -i:%d   -b:%d   -f:%d   -r:%d\n", *t_index, *i_index, *b_index,
 			*f_index, *r_index);
 #endif
+	return 0;
 }
 
 int parse_args(int argc, char **argv, int *is_transmitter)
@@ -124,7 +128,11 @@ int parse_args(int argc, char **argv, int *is_transmitter)
 
 	int t_index = -1, i_index = -1, b_index = -1, f_index = -1, r_index = -1;
 
-	parse_flags(&t_index, &i_index, &b_index, &f_index, &r_index, argc, argv);
+	if (parse_flags(&t_index, &i_index, &b_index, &f_index, &r_index, argc,
+			argv)) {
+		fprintf(stderr, "Error: bad flag parameter\n");
+		return -1;
+	}
 
 	if (t_index > 0 && t_index < argc - 1) {
 		if (read_file_from_disk(argv[t_index + 1], &file_to_send) < 0) {

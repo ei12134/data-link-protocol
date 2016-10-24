@@ -13,6 +13,7 @@
 #include "serial_port.h"
 
 typedef unsigned char byte;
+int serial_port_baudrate = B19200;
 
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 

@@ -2,6 +2,7 @@
 #define SERIAL_PORT_H_
 
 #include "byte.h"
+extern int serial_port_baudrate;
 
 byte serial_port_last_byte();
 byte serial_port_previous_last_byte();
