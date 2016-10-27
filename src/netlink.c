@@ -34,8 +34,10 @@ int parse_serial_port_arg(int index, char **argv)
 {
 	if ((strcmp("/dev/ttyS0", argv[index]) != 0)
 			&& (strcmp("/dev/ttyS1", argv[index]) != 0)
-			&& (strcmp("/dev/ttyS4", argv[index]) != 0))
-		return -3;
+			&& (strcmp("/dev/ttyS4", argv[index]) != 0)) {
+		fprintf(stderr, "Error: bad serial port value\n");
+		return -1;
+	}
 
 	return index;
 }
@@ -88,6 +90,9 @@ int parse_baudrate_arg(int baurdate_index, char **argv)
 		serial_port_baudrate = B38400;
 		return 0;
 	}
+	fprintf(stderr, "Error: bad serial port baudrate value\n");
+	fprintf(stderr,
+			"Valid baudrates: B110, B134, B150, B200, B300, B600, B1200, B1800, B2400, B4800, B9600, B19200, B38400\n");
 	return -1;
 }
 
@@ -110,8 +115,8 @@ int parse_flags(int* t_index, int* i_index, int* b_index, int* f_index,
 		}
 	}
 #ifdef NETLINK_DEBUG_MODE
-	fprintf(stderr,"parse_flags()\n");
-	fprintf(stderr,"\t-t:%d   -i:%d   -b:%d   -f:%d   -r:%d\n", *t_index, *i_index, *b_index,
+	fprintf(stderr,"\nparse_flags(): flag indexes\n");
+	fprintf(stderr,"  -t=%d\n  -i=%d\n  -b=%d\n  -f=%d\n  -r=%d\n", *t_index, *i_index, *b_index,
 			*f_index, *r_index);
 #endif
 	return 0;
@@ -119,6 +124,12 @@ int parse_flags(int* t_index, int* i_index, int* b_index, int* f_index,
 
 int parse_args(int argc, char **argv, int *is_transmitter)
 {
+
+#ifdef NETLINK_DEBUG_MODE
+	fprintf(stderr,"\nparse_args(): received arguments\n");
+	fprintf(stderr,"  argc=%d\n  argv=%s\n", argc, *argv);
+#endif
+
 	if (argc < 2) {
 		return -1;
 	}
