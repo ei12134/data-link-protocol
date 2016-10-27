@@ -453,6 +453,8 @@ int parse_data_packet(const int data_packet_length, byte *data_packet,
 	if (received_sequence_number != expected_sequence_number) {
 #ifdef APPLICATION_LAYER_DEBUG_MODE
 		fprintf(stderr, "bad packet sequence number: (received %zu) <-> (expected %zu)\n", received_sequence_number, expected_sequence_number);
+		free(data_packet);
+			return -1;
 #endif
 		if (received_sequence_number > expected_sequence_number) {
 

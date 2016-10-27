@@ -2,12 +2,13 @@
 #define DATA_LINK_H_
 
 /* Settings */
+//#define LL_MAX_FRAME_SZ 64
 //#define LL_MAX_FRAME_SZ 128
 //#define LL_MAX_FRAME_SZ 256
-//#define LL_MAX_FRAME_SZ 512
+#define LL_MAX_FRAME_SZ 512
 //#define LL_MAX_FRAME_SZ 1024
 //#define LL_MAX_FRAME_SZ 2048
-#define LL_MAX_FRAME_SZ 4096
+//#define LL_MAX_FRAME_SZ 4096
 //#define LL_MAX_FRAME_SZ 8192
 //#define LL_MAX_FRAME_SZ 16384
 //#define LL_MAX_FRAME_SZ 32768

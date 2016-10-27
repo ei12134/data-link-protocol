@@ -89,7 +89,11 @@ static Return_e parse_frame_from_array(struct frame* frame, byte *a)
 
 	frame->address = *a++;
 	// TODO: verificar que o 'control' é válido e sair antecipadamente
+//	(accepted ? C_RR : C_REJ) | ((frame_number) ? 0 : (1 << 7));
 	frame->control = *a++;
+	if ((frame->control & 7) == C_REJ) {
+		return BADFRAME_CODE;
+	}
 	const byte header_bcc = *a++;
 	if (header_bcc != (frame->address ^ frame->control)) {
 #ifdef DATA_LINK_DEBUG_MODE
@@ -362,7 +366,7 @@ int f_send_acknowledged_frame(const int fd, const unsigned num_retransmissions,
 #ifdef DATA_LINK_DEBUG_MODE
 				fprintf(stderr,"f_send_acknowledged_frame(): bad frame\n");
 #endif
-			ntries = num_retransmissions;
+			ntries--;
 			continue;
 		} else {
 			break;

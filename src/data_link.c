@@ -10,16 +10,16 @@
 #define TRUE 1
 #define FALSE 1
 
-static long g_use_limited_rejected_retries = 0; // true or false
+static long g_use_limited_rejected_retries = 1; // true or false
 
 byte data_reply_byte(unsigned long frame_number, int accepted)
 {
-	return (accepted ? C_RR : C_REJ) | ((accepted) ? 0 : (1 << 5));
+	return (accepted ? C_RR : C_REJ) | ((frame_number) ? 0 : (1 << 7));
 }
 
 byte data_control_byte(unsigned long frame_number)
 {
-	return (frame_number % 2 == 0) ? 0 : (1 << 5);
+	return (frame_number % 2 == 0) ? 0 : (1 << 6);
 }
 
 static int handle_disconnect(struct connection* conn)
