@@ -133,7 +133,7 @@ int parse_flags(int* t_index, int* i_index, int* b_index, int* p_index,
 			*b_index = i;
 		} else if ((strcmp("-p", argv[i]) == 0)) {
 			*p_index = i;
-		} else if ((strcmp("-r", argv[1]) == 0)) {
+		} else if ((strcmp("-r", argv[i]) == 0)) {
 			*r_index = i;
 		} else if ((argv[i][0] == '-')) {
 			return -1;
