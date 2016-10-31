@@ -23,7 +23,7 @@ void help(char **argv)
 	fprintf(stderr, "  -i\t\t\ttransmit data read from stdin\n");
 	fprintf(stderr, "  -b <BAUDRATE>\t\tbaudrate of the serial port\n");
 	fprintf(stderr,
-			"  -p <DATASIZE>\tmaximum bytes of data transfered in each frame\n");
+			"  -p <DATASIZE>\t\tmaximum bytes of data transfered each frame\n");
 	fprintf(stderr, "  -r <RETRY>\t\tnumber of retry attempts\n");
 }
 
