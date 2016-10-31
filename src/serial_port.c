@@ -110,6 +110,7 @@ int serial_port_write(int fd, byte *data, int len)
 	fprintf(stderr,"serial_port_write(): writting: length = %d, fd = %d\n",len,fd);
 #endif
 
+    //fprintf(stderr,"write\n");
 	int result = write(fd, data, len);
 
 	if (result < 0) {
@@ -140,6 +141,7 @@ int serial_port_read(int fd, byte *data, byte delim, int maxc)
 
 	g_previous_last_byte = g_last_byte;
 
+    //fprintf(stderr,"read\n");
 	byte *p = data;
 	int nc = 0; // num chars read so far
 	do {

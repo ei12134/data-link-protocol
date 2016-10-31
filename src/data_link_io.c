@@ -88,12 +88,7 @@ static Return_e parse_frame_from_array(struct frame* frame, byte *a)
 	}
 
 	frame->address = *a++;
-	// TODO: verificar que o 'control' é válido e sair antecipadamente
-//	(accepted ? C_RR : C_REJ) | ((frame_number) ? 0 : (1 << 7));
 	frame->control = *a++;
-	if ((frame->control & 7) == C_REJ) {
-		return BADFRAME_CODE;
-	}
 	const byte header_bcc = *a++;
 	if (header_bcc != (frame->address ^ frame->control)) {
 #ifdef DATA_LINK_DEBUG_MODE
@@ -136,26 +131,6 @@ static Return_e parse_frame_from_array(struct frame* frame, byte *a)
 			return BADFRAME_CODE;
 		}
 
-		/*
-		 * Stop loop condition.
-		 */
-		if (a[num_bytes + 1] == FLAG) {
-			if (a[num_bytes] != data_bcc) {
-				++g_data_bcc_error_counter;
-#ifdef DATA_LINK_DEBUG_MODE
-				fprintf(stderr,"parse_frame_from_array(): data bcc: line %d.\n",__LINE__);
-				fprintf(stderr, "frame size %ld\n", frame->size);
-				fprintf(stderr, "data bcc = %x\n", data_bcc);
-				fprintf(stderr, "a[num_bytes] = %x\n", a[num_bytes]);
-#endif
-				return BADFRAME_CODE;
-			}
-#ifdef DATA_LINK_DEBUG_MODE
-			fprintf(stderr,"  parse_frame_from_array(): successful read.\n");
-#endif
-			return SUCCESS_CODE;
-		}
-
 		byte c;
 		if (a[num_bytes] == BS_ESC) {
 			fprintf(stderr, "----\n");
@@ -165,32 +140,59 @@ static Return_e parse_frame_from_array(struct frame* frame, byte *a)
 		} else {
 			c = a[num_bytes];
 		}
-		++num_bytes;
-		data_bcc ^= c;
-		frame->data[frame->size++] = c;
-		fprintf(stderr, "%x\n", c);
+        ++num_bytes;
+        frame->data[frame->size++] = c;
+        fprintf(stderr, "%x\n", c);
+
+		/*
+		 * Stop loop condition.
+		 */
+		if (a[num_bytes] == FLAG) {
+			if (frame->data[frame->size-1] != data_bcc) {
+				++g_data_bcc_error_counter;
+#ifdef DATA_LINK_DEBUG_MODE
+				fprintf(stderr,"parse_frame_from_array(): data bcc error: line %d.\n",__LINE__);
+				fprintf(stderr, "frame size %ld\n", frame->size);
+				fprintf(stderr, "data bcc = %x\n", data_bcc);
+				fprintf(stderr, "a[num_bytes-1] = %x\n", a[num_bytes-1]);
+#endif
+				return BADFRAME_CODE;
+			}
+#ifdef DATA_LINK_DEBUG_MODE
+			fprintf(stderr,"  parse_frame_from_array(): successful read.\n");
+#endif
+			return SUCCESS_CODE;
+		} else {
+            data_bcc ^= c;
+            fprintf(stderr,"c = %x, bcc = %x\n",c,data_bcc);
+        }
+
 	}
 }
 
 static byte *
-copy_and_stuff_bytes(byte *dest, const byte *src, const size_t src_size,
-		byte *src_bcc)
+copy_and_stuff_bytes(byte *dest, const byte *src, const size_t src_size)
 {
 	int bcc = 0;
-	for (int i = 0; i < src_size; ++i) {
-		byte c = src[i];
-		bcc ^= c;
+	for (int i = 0; i <= src_size; ++i) {
+        byte c;
+        if (i != src_size) {
+            c = src[i];
+            bcc ^= c;
+            fprintf(stderr,"c = %x, bcc = %x\n",c,bcc);
+            //fprintf(stderr, "%2x\n", c);
+        } else {
+            fprintf(stderr,"bcc = %x\n",bcc);
+            c = bcc;
+        }
 		if (c == FLAG || c == BS_ESC) {
 			*dest++ = BS_ESC;
 			*dest++ = BS_OCT ^ c;
 		} else {
 			*dest++ = c;
 		}
-		fprintf(stderr, "%2x\n", c);
 	}
-	*src_bcc = bcc;
-	fprintf(stderr, "size %ld\n", src_size);
-	fprintf(stderr, "bcc %2x\n", bcc);
+	fprintf(stderr, "size %ld (not counting bcc)\n", src_size);
 	return dest;
 }
 
@@ -225,9 +227,7 @@ Return_e f_send_frame(const int fd, const struct frame frame)
 		return ERROR_CODE;
 
 	} else if (frame.size > 0) { // frame might be 0 if it is supervision
-		byte data_bcc;
-		bp = copy_and_stuff_bytes(bp, frame.data, frame.size, &data_bcc);
-		*bp++ = data_bcc;
+		bp = copy_and_stuff_bytes(bp, frame.data, frame.size);
 #ifdef DATA_LINK_DEBUG_MODE
 		fprintf(stderr,"f_send_frame(): unstuffed data size %ld.\n",frame.size);
 #endif
@@ -322,6 +322,9 @@ Return_e f_receive_frame(const int fd, struct frame* frame, const int timeout_s)
 			if (ret == SUCCESS_CODE) {
 				++g_rec_frame_counter;
 			}
+            else if (ret == BADFRAME_CODE) {
+                fprintf(stderr,"bad frame detected while parsing\n");
+            }
 			return ret;
 		}
 		if (using_timeout && g_timeout_alarm) {
@@ -368,6 +371,9 @@ int f_send_acknowledged_frame(const int fd, const unsigned num_retransmissions,
 #endif
 			ntries--;
 			continue;
+        } else if ((reply->control & 7) == C_REJ) {
+            fprintf(stderr,"detected rejected frame while parsing\n");
+            ntries--;
 		} else {
 			break;
 		}

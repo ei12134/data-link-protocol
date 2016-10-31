@@ -26,6 +26,7 @@ struct connection g_connections[MAX_FD];
 
 int send_file(char *port, struct file *file, int max_send_attempts)
 {
+    fprintf(stderr,"send_file\n");
 	int fd = 0;
 	struct connection* connection;
 	int attempts_left = max_send_attempts;
@@ -36,6 +37,7 @@ int send_file(char *port, struct file *file, int max_send_attempts)
 	while (attempts_left) {
 		switch (state) {
 		case SND_OPEN_CONNECTION:
+            fprintf(stderr,"open connection\n");
 			if ((fd = llopen(port, 1)) > 0) {
 				connection = &g_connections[fd];
 				attempts_left = max_send_attempts;
@@ -50,6 +52,7 @@ int send_file(char *port, struct file *file, int max_send_attempts)
 			}
 			break;
 		case SND_START_CONTROL_PACKET:
+            fprintf(stderr,"start control packet\n");
 			if (send_control_packet(connection, file, control_field_start)
 					< 0) {
 #ifdef APPLICATION_LAYER_DEBUG_MODE
@@ -64,6 +67,7 @@ int send_file(char *port, struct file *file, int max_send_attempts)
 			}
 			break;
 		case SND_DATA_PACKETS:
+            fprintf(stderr,"send data packets\n");
 			if (send_data_packets(connection, file, &num_data_bytes_sent,
 					&sequence_number) < 0) {
 #ifdef APPLICATION_LAYER_DEBUG_MODE
@@ -109,8 +113,7 @@ int send_control_packet(struct connection* connection, struct file *file,
 		byte control_field)
 {
 	// 5 bytes plus 2 specific data type sizes (value fields)
-	size_t control_packet_size = (5 + sizeof(size_t)
-			+ ((strlen(file->name) + 1) * sizeof(char)));
+	size_t control_packet_size = (5 + sizeof(size_t) + ((strlen(file->name) + 1) * sizeof(char)));
 	if (control_packet_size > connection->packet_size) {
 		fprintf(stderr, "control_packet_size > allowed packet size");
 		return -1;
@@ -170,6 +173,7 @@ int send_control_packet(struct connection* connection, struct file *file,
 int send_data_packets(struct connection* connection, struct file* file,
 		size_t* num_data_bytes_sent, size_t* sequence_number)
 {
+    fprintf(stderr,"send_data_packets\n");
 	byte* file_data_pointer = (byte*) file->data;
 	const byte* eof_data_pointer = ((byte*) file->data
 			+ file->size * sizeof(char));
@@ -178,6 +182,7 @@ int send_data_packets(struct connection* connection, struct file* file,
 		file_data_pointer++;
 
 	while (file_data_pointer < eof_data_pointer) {
+        fprintf(stderr,"while (file_data_pointer < eof_data_pointer)\n");
 		size_t max_data_size = connection->packet_size
 				- data_packet_header_size;
 		size_t remaining_data_bytes = file->size - *num_data_bytes_sent;
@@ -194,11 +199,13 @@ int send_data_packets(struct connection* connection, struct file* file,
 		}
 
 		data_packet[control_field_index] = control_field_data;
-		data_packet[data_packet_sequence_number_index] = *sequence_number
-				% sequence_number_modulus;
+		data_packet[data_packet_sequence_number_index] = 
+            (*sequence_number) % sequence_number_modulus;
 		(*sequence_number)++;
 		data_packet[data_packet_l2_index] = (data_bytes_to_send / 256);
 		data_packet[data_packet_l1_index] = (data_bytes_to_send % 256);
+        //fprintf(stderr,"sending packet %zu\n",data_packet_sequence_number_index);
+        fprintf(stderr,"sequence_number: %ld\n",*sequence_number);
 
 		for (size_t i = 0;
 				file_data_pointer < eof_data_pointer && i < data_bytes_to_send;
@@ -208,11 +215,11 @@ int send_data_packets(struct connection* connection, struct file* file,
 
 			file_data_pointer++;
 			(*num_data_bytes_sent)++;
-
 		}
 
 		if (transmitter_write(connection, data_packet, data_packet_size) < 0) {
 			free(data_packet);
+            fprintf(stderr,"transmitter write returned negative\n");
 			return -1;
 		}
 
@@ -232,6 +239,7 @@ int receive_file(char *port, int max_receive_attempts)
 	while (attempts_left) {
 		switch (state) {
 		case RCV_OPEN_CONNECTION:
+            fprintf(stderr,"opening connection..\n");
 			if ((fd = llopen(port, 0)) > 0) {
 				state = RCV_START_CONTROL_PACKET;
 				attempts_left = max_receive_attempts;
@@ -241,6 +249,7 @@ int receive_file(char *port, int max_receive_attempts)
 			break;
 
 		case RCV_START_CONTROL_PACKET:
+            fprintf(stderr,"expecting control packet\n");
 			if (receive_start_control_packet(fd, &file_name, &file_size) < 0) {
 #ifdef APPLICATION_LAYER_DEBUG_MODE
 				fprintf(stderr,
@@ -257,6 +266,7 @@ int receive_file(char *port, int max_receive_attempts)
 			break;
 
 		case RCV_DATA_PACKETS:
+            fprintf(stderr,"expecting data packet\n");
 			if (receive_data_packets(fd, file_name, file_size, attempts_left)
 					< 0) {
 				return -1;

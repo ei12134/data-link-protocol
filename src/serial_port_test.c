@@ -72,20 +72,32 @@ int send_receive_test(char* port,byte* test_message)
             printf("line: %d\n",__LINE__);
             return 1;
         }
+        printf("len = %d\n",len);
         //printf("Message sent: %s\n",s);
 
         byte s[BUFSIZE];
-        for (int i=0; s[i] != '\0'; i++) {
-            s[i] = 'x';
+        for (int i=0; i < BUFSIZE; i++) {
+            s[i] = 1;
         }
-        if (serial_port_read(fd,s,'\0',BUFSIZE) < 0) {
+        int r = serial_port_read(fd,s,'\0',BUFSIZE);
+        if (r <= 0) {
+            printf("r = %d\n",r);
             printf("line: %d\n",__LINE__);
             return 1;
         }
         //printf("Message received: %s\n",s);
 
 	if (strcmp((char*)test_message,(char*)s) != 0) {
+        printf("r = %d\n",r);
 		printf("Test failed\n");
+        /*
+        for (int i = 0; test_message[i] != '\0'; ++i) {
+            if (test_message[i] != s[i]) {
+                printf("test_message %x\n",test_message[i]);
+                printf("s %x\n",s[i]);
+            }
+        }
+        */
 		return -1;
 	}
 
@@ -241,10 +253,13 @@ int test3(int argc,char **argv)
     }
 
     byte message[256];
-    for (int j = 0; j <= 254; ++j) {
+    for (int j = 0; j < 256; ++j) {
 	    message[j] = j+1;
     }
     message[255] = '\0';
+    //message[0] = 100;
+    //message[1] = 101;
+    //message[2] = 0;
 
     if (send_receive_test(argv[i],message) == 0) {
         printf("Test 3 passed\n");
@@ -254,11 +269,11 @@ int test3(int argc,char **argv)
 
 int main(int argc, char **argv)
 {
-    printf("Test 1...\n");
-    assert(test1(argc,argv) == 0);
+    //printf("Test 1...\n");
+    //assert(test1(argc,argv) == 0);
 
-    printf("Test 2...\n");
-    assert(test2(argc,argv) == 0);
+    //printf("Test 2...\n");
+    //assert(test2(argc,argv) == 0);
 
     printf("Test 3...\n");
     assert(test3(argc,argv) == 0);

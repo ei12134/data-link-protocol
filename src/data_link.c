@@ -8,13 +8,13 @@
 #include <stdlib.h>
 
 #define TRUE 1
-#define FALSE 1
+#define FALSE 0
 
 static long g_use_limited_rejected_retries = 1; // true or false
 
 byte data_reply_byte(unsigned long frame_number, int accepted)
 {
-	return (accepted ? C_RR : C_REJ) | ((frame_number) ? 0 : (1 << 7));
+	return (accepted ? C_RR : C_REJ) | ((frame_number % 2) ? 0 : (1 << 7));
 }
 
 byte data_control_byte(unsigned long frame_number)
@@ -93,37 +93,45 @@ int transmitter_connect(struct connection* conn)
 
 int transmitter_write(struct connection* conn, byte* data_packet, size_t size)
 {
+	fprintf(stderr," #-#################################### \n");
+	fprintf(stderr,"\n");
+	fprintf(stderr," BEGIN TRANSMIT %zu\n", conn->frame_number);
+	fprintf(stderr,"\n");
+	fprintf(stderr," ###################################### \n");
+
 	struct frame out_frame = { .address = A, .control = data_control_byte(
 			conn->frame_number), .size = size, .data = data_packet };
 
-	printf(" ###################################### \n");
-	printf("\n");
-	printf(" BEGIN TRANSMIT %x\n", out_frame.control);
-	printf("\n");
-	printf(" ###################################### \n");
-
 	byte success_rep = data_reply_byte(conn->frame_number, TRUE);
 	byte rej_rep = data_reply_byte(conn->frame_number, FALSE);
+    fprintf(stderr,"success_rep = %x\n",success_rep);
+    fprintf(stderr,"rej_rep = %x\n",rej_rep);
 
 	/* Send data frame and receive confirmation.  */
 	int ntries = conn->num_retransmissions;
 	while (1) {
 		struct frame reply_frame;
+        fprintf(stderr,"trying to send frame %lu\n",conn->frame_number);
 		if ((ntries = f_send_acknowledged_frame(conn->fd, ntries,
 				conn->timeout_s, out_frame, &reply_frame)) < 0) {
+            fprintf(stderr,"failed acknowledged frame\n");
 			return -1;
 		}
+        fprintf(stderr," ---- control = %x\n",reply_frame.control);
 		if (reply_frame.control == rej_rep) {
+            fprintf(stderr,"rejected frame\n");
 			if (g_use_limited_rejected_retries) {
 				--ntries;
 			}
 		}
 		if (reply_frame.control == success_rep) {
+            fprintf(stderr,"accepted frame\n");
 			break;
 		}
 	}
 
 	conn->frame_number++;
+    fprintf(stderr,"new frame number: %zu\n",conn->frame_number);
 	return 0;
 }
 
@@ -191,6 +199,7 @@ int receiver_listen(struct connection* conn)
 		if (f_receive_frame(conn->fd, &in, 0) == ERROR_CODE) {
 			return -1;
 		}
+        fprintf(stderr,"receiver_listen: %x\n",in.control);
 		if (in.control == C_SET) {
 			f_send_frame(conn->fd, UA);
 			conn->is_active = 1;
@@ -210,16 +219,16 @@ int receiver_read(struct connection* conn, byte *begin, size_t max_data_size,
 	byte *end = begin + max_data_size;
 
 	while (p < end && (num_frames < max_num_frames || max_num_frames == 0)) {
+		fprintf(stderr," ###################################### \n");
+		fprintf(stderr,"\n");
+		fprintf(stderr," BEGIN RECEIVE %zu\n", conn->frame_number);
+		fprintf(stderr,"\n");
+		fprintf(stderr," ###################################### \n");
+
 		struct frame in;
 		in.data = p;
 		in.max_data_size = end - p;
 		Return_e ret = f_receive_frame(conn->fd, &in, 0);
-
-		printf(" ###################################### \n");
-		printf("\n");
-		printf(" BEGIN RECEIVE %x\n", in.control);
-		printf("\n");
-		printf(" ###################################### \n");
 
 		if (ret == ERROR_CODE) {
 			return -1;
@@ -267,6 +276,7 @@ int receiver_read(struct connection* conn, byte *begin, size_t max_data_size,
 				break;
 			}
 			conn->frame_number++;
+            fprintf(stderr,"new frame number: %zu\n",conn->frame_number);
 		}
 	}
 	return p - begin;
