@@ -8,7 +8,7 @@
 #include "byte.h"
 #include "packets.h"
 
-int max_data_transfer = 128;
+int max_data_transfer = FRAME_SIZE;
 
 size_t real_file_bytes = 0;
 size_t received_file_bytes = 0;

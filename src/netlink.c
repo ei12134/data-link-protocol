@@ -13,7 +13,7 @@
 #include "serial_port.h"
 
 struct file file_to_send;
-int max_retries = 1;
+int max_retries = 3;
 
 void help(char **argv)
 {
@@ -111,7 +111,7 @@ void parse_max_retries(int packet_size_index, char **argv)
 {
 	int val = atoi(argv[packet_size_index]);
 	if (val <= 0)
-		max_retries = 1;
+		max_retries = 4;
 	else
 		max_retries = 1 + val;
 
