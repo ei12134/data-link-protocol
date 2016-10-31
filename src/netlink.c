@@ -13,11 +13,7 @@
 #include "serial_port.h"
 
 struct file file_to_send;
-
-size_t real_file_bytes = 0;
-size_t received_file_bytes = 0;
-size_t lost_packets = 0;
-size_t duplicated_packets = 0;
+int max_retries = 1;
 
 void help(char **argv)
 {
@@ -26,7 +22,8 @@ void help(char **argv)
 	fprintf(stderr, "  -t <FILEPATH>\t\ttransmit file over the serial port\n");
 	fprintf(stderr, "  -i\t\t\ttransmit data read from stdin\n");
 	fprintf(stderr, "  -b <BAUDRATE>\t\tbaudrate of the serial port\n");
-	fprintf(stderr, "  -f <FRAMESIZE>\tmaximum unstuffed frame size\n");
+	fprintf(stderr,
+			"  -p <DATASIZE>\tmaximum bytes of data transfered in each frame\n");
 	fprintf(stderr, "  -r <RETRY>\t\tnumber of retry attempts\n");
 }
 
@@ -96,7 +93,35 @@ int parse_baudrate_arg(int baurdate_index, char **argv)
 	return -1;
 }
 
-int parse_flags(int* t_index, int* i_index, int* b_index, int* f_index,
+void parse_max_packet_size(int packet_size_index, char **argv)
+{
+	int val = atoi(argv[packet_size_index]);
+	if (val > FRAME_SIZE || val < 0)
+		max_data_transfer = FRAME_SIZE;
+	else
+		max_data_transfer = val;
+
+#ifdef NETLINK_DEBUG_MODE
+	fprintf(stderr,"\nparse_max_packet_size:\n");
+	fprintf(stderr,"  max_packet_size=%d\n", max_data_transfer);
+#endif
+}
+
+void parse_max_retries(int packet_size_index, char **argv)
+{
+	int val = atoi(argv[packet_size_index]);
+	if (val <= 0)
+		max_retries = 1;
+	else
+		max_retries = 1 + val;
+
+#ifdef NETLINK_DEBUG_MODE
+	fprintf(stderr,"\nmax_retries:\n");
+	fprintf(stderr,"  max_retries=%d\n", max_retries);
+#endif
+}
+
+int parse_flags(int* t_index, int* i_index, int* b_index, int* p_index,
 		int* r_index, int argc, char **argv)
 {
 	for (size_t i = 0; i < (argc - 1); i++) {
@@ -106,8 +131,8 @@ int parse_flags(int* t_index, int* i_index, int* b_index, int* f_index,
 			*i_index = i;
 		} else if ((strcmp("-b", argv[i]) == 0)) {
 			*b_index = i;
-		} else if ((strcmp("-f", argv[i]) == 0)) {
-			*f_index = i;
+		} else if ((strcmp("-p", argv[i]) == 0)) {
+			*p_index = i;
 		} else if ((strcmp("-r", argv[1]) == 0)) {
 			*r_index = i;
 		} else if ((argv[i][0] == '-')) {
@@ -116,8 +141,8 @@ int parse_flags(int* t_index, int* i_index, int* b_index, int* f_index,
 	}
 #ifdef NETLINK_DEBUG_MODE
 	fprintf(stderr,"\nparse_flags(): flag indexes\n");
-	fprintf(stderr,"  -t=%d\n  -i=%d\n  -b=%d\n  -f=%d\n  -r=%d\n", *t_index, *i_index, *b_index,
-			*f_index, *r_index);
+	fprintf(stderr,"  -t=%d\n  -i=%d\n  -b=%d\n  -p=%d\n  -r=%d\n", *t_index, *i_index, *b_index,
+			*p_index, *r_index);
 #endif
 	return 0;
 }
@@ -137,9 +162,9 @@ int parse_args(int argc, char **argv, int *is_transmitter)
 	if (argc == 2)
 		return parse_serial_port_arg(1, argv);
 
-	int t_index = -1, i_index = -1, b_index = -1, f_index = -1, r_index = -1;
+	int t_index = -1, i_index = -1, b_index = -1, p_index = -1, r_index = -1;
 
-	if (parse_flags(&t_index, &i_index, &b_index, &f_index, &r_index, argc,
+	if (parse_flags(&t_index, &i_index, &b_index, &p_index, &r_index, argc,
 			argv)) {
 		fprintf(stderr, "Error: bad flag parameter\n");
 		return -1;
@@ -165,23 +190,21 @@ int parse_args(int argc, char **argv, int *is_transmitter)
 		}
 	}
 
-	return parse_serial_port_arg(argc - 1, argv);
-}
+	if (p_index > 0 && p_index < argc - 1) {
+		parse_max_packet_size(p_index + 1, argv);
+	}
 
-void receiver_stats()
-{
-	fprintf(stdout, "Receiver statistics\n");
-	fprintf(stdout, "\treceived file bytes/file bytes:%zu/%zu\n",
-			received_file_bytes, real_file_bytes);
-	fprintf(stdout, "\tlost packets:%zu\n", lost_packets);
-	fprintf(stdout, "\tduplicated packets:%zu\n", duplicated_packets);
+	if (r_index > 0 && r_index < argc - 1) {
+		parse_max_retries(r_index + 1, argv);
+	}
+
+	return parse_serial_port_arg(argc - 1, argv);
 }
 
 int main(int argc, char **argv)
 {
 	int port_index = -1;
 	int is_transmitter = 0;
-	int exit_code = 0;
 
 	if ((port_index = parse_args(argc, argv, &is_transmitter)) < 0) {
 		help(argv);
@@ -190,16 +213,13 @@ int main(int argc, char **argv)
 
 	if (is_transmitter) {
 		fprintf(stderr, "transmitting %s\n", file_to_send.name);
-		exit_code = send_file(argv[port_index], &file_to_send, 5);
+		return send_file(argv[port_index], &file_to_send, max_retries);
 	} else {
 		fprintf(stderr, "receiving file\n");
 #ifdef NETLINK_DEBUG_MODE
 		fprintf(stderr, "\tserial_port_baudrate:%d\n", serial_port_baudrate);
 		fprintf(stderr, "\tis_transmitter:%d\n", is_transmitter);
 #endif
-		exit_code = receive_file(argv[port_index], 5);
-		receiver_stats();
+		return receive_file(argv[port_index], max_retries);
 	}
-
-	exit(exit_code);
 }

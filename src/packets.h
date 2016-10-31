@@ -8,6 +8,17 @@
 #include "byte.h"
 #include "packets.h"
 
+extern int max_data_transfer;
+
+#define MAX_FD 10
+
+#define FRAME_SIZE LL_MAX_PAYLOAD_UNSTUFFED
+#define NUM_FRAMES_PER_CALL 1
+#define TIMEOUT_S 5
+#define MICRO_TIMEOUT_DS 5
+#define NUM_RETRANSMISSIONS 3
+#define CLOSE_WAIT_TIME 3
+
 // data packet general constants
 const static byte control_field_data = 1;
 const static byte control_field_start = 2;
@@ -65,6 +76,7 @@ int receive_data_packet(const int fd, char **data, size_t received_file_bytes,
 		size_t* sequence_number);
 int llopen(char *port, int transmitter);
 int connect(char *port, int transmitter);
+void receiver_stats();
 int llclose(const int fd);
 
 void retry(int* attempt);
