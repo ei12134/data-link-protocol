@@ -1,80 +1,67 @@
-\documentclass[a4paper,11pt]{article}
-\usepackage[latin1]{inputenc}
+\documentclass[a4paper,11pt,titlepage]{article}
+\usepackage[utf8]{inputenc}
 \usepackage{lmodern}
 \usepackage[T1]{fontenc}
 \usepackage[babel=true]{microtype}
 \usepackage[portuguese]{babel}
 \usepackage[pdftex]{hyperref}
+\usepackage{graphicx}
+\usepackage{eurosym}
+\usepackage{scrextend}
 \usepackage{hyphenat}
-\usepackage{latexsym}
-\usepackage{amssymb,amsmath}
-\usepackage{varwidth}
-\usepackage{verbatim}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{float}
 
-\newenvironment{centerverbatim}{%
-  \par
-  \centering
-  \varwidth{\linewidth}%
-  \verbatim
-}{%
-  \endverbatim
-  \endvarwidth
-  \par
-}
+\title{\huge \textbf{Protocolo de LigaÃ§Ã£o de Dados\\[1cm] \Large RelatÃ³rio intercalar\\[0.7cm]
+\includegraphics{res/logo.png}\\[0.7cm] \large Redes de Computadores\\[0.25cm] \small $3^o$ ano\\[0.05cm]Mestrado Integrado em Engenharia InformÃ¡tica e
+ComputaÃ§Ã£o\\[1cm]}\normalsize Turma 4}
+
+\author{Carolina Moreira\\Daniel Fazeres\\JosÃ© Peixoto \and 201303494\\201502846\\200603103 \and  up201303494@fe.up.pt\\up201502846@fe.up.pt\\ei12134@fe.up.pt}
 
 \begin{document}
-
-\begin{titlepage}
-\title{Redes de Computadores\\[4.7cm] \huge \textbf{Ligação de dados}\\[4.7cm]\normalsize  Turma 3 - Grupo X\\[0.5cm]}
-\author{José Peixoto\\Maria Chaves\\Daniel Fazeres \and 200603103\\201306842\\201502846 \and ei12134@fe.up.pt\\up201306842@fe.up.pt\\up201502846@fe.up.pt\\[4.7cm]}
 \maketitle
-\thispagestyle{empty} % titlepage must not be numbered
-\end{titlepage}
 
-\newpage
-\tableofcontents
-\newpage
+\abstract
+(dois parÃ¡grafos: um sobre o contexto do trabalho; outro sobre as principais conclusÃµes do relatÃ³rio)
 
-\begin{abstract}
-No âmbito da unidade curricular de Redes de Computadores, foi-nos proposto o desenvolvimento de uma aplicação de ligação de dados...
-\end{abstract}
-
-\section{Introdução}
-
-\subsection{Objectivos}
-Indicação dos objectivos do trabalho e do relatório
-
-\subsection{Índice}
-Descrição da lógica do relatório com indicações sobre o tipo de informação que poderá ser encontrada em cada uma secções seguintes
+\section{IntroduÃ§Ã£o}
+\iffalse(indicaÃ§Ã£o dos objectivos do trabalho e do relatÃ³rio; descriÃ§Ã£o da lÃ³gica do relatÃ³rio com indicaÃ§Ãµes sobre o tipo de informaÃ§Ã£o que poderÃ¡ ser encontrada em cada uma secÃ§Ãµes seguintes)\fi
 
 \section{Arquitetura}
-Blocos funcionais e interfaces
+\iffalse (blocos funcionais e interfaces)\fi
 
-\section{Estrutura do código}
-APIs, principais estruturas de dados, principais funções e sua relação com a arquitetura
+\section{Estrutura do cÃ³digo}
+\iffalse (APIs, principais estruturas de dados, principais funÃ§Ãµes e sua relaÃ§Ã£o com a arquitetura) \fi
 
 \section{Casos de uso principais}
-Identificação; sequências de chamada de funções
+\iffalse (identificaÃ§Ã£o; sequÃªncias de chamada de funÃ§Ãµes) \fi
 
-\section{Protocolo de ligação lógica}
-Identificação dos principais aspectos funcionais; descrição da estratégia de implementação destes aspectos com apresentação de extratos de código
+\section{Protocolo de ligaÃ§Ã£o lÃ³gica}
+\iffalse (identificaÃ§Ã£o dos principais aspectos funcionais; descriÃ§Ã£o da estratÃ©gia de implementaÃ§Ã£o destes aspectos com apresentaÃ§Ã£o de extratos de cÃ³digo) \fi
 
-\section{Protocolo de aplicação}
-Identificação dos principais aspectos funcionais; descrição da estratégia de implementação destes aspectos com apresentação de extractos de código
+\section{Protocolo de aplicaÃ§Ã£o}
+\iffalse (identificaÃ§Ã£o dos principais aspectos funcionais; descriÃ§Ã£o da estratÃ©gia de implementaÃ§Ã£o destes aspectos com apresentaÃ§Ã£o de extractos de cÃ³digo) \fi
 
-\section{Validação}
-Descrição dos testes efectuados com apresentação quantificada dos resultados, se possível
+\section{ValidaÃ§Ã£o}
+\iffalse (descriÃ§Ã£o dos testes efectuados com apresentaÃ§Ã£o quantificada dos resultados, se possÃ­vel) \fi
 
-\section{Elementos de valorização}
-Identificação dos elementos de valorização implementados; descrição da estratégia de implementação com apresentação de pequenos extratos de código
+\section{Elementos de valorizaÃ§Ã£o}
+\iffalse (identificaÃ§Ã£o dos elementos de valorizaÃ§Ã£o implementados; descriÃ§Ã£o da estratÃ©gia de implementaÃ§Ã£o com apresentaÃ§Ã£o de pequenos extratos de cÃ³digo) \fi
 
-\section{Conclusões}
-Síntese da informação apresentada nas secções anteriores; reflexão sobre os objectivos de aprendizagem alcançados
+\section{ConclusÃµes}
+\iffalse (sÃ­ntese da informaÃ§Ã£o apresentada nas secÃ§Ãµes anteriores; reflexÃ£o sobre os objectivos de aprendizagem alcanÃ§ados) \fi
 
-{\let\thefootnote\relax\footnote{N.B. Este relatório não foi escrito ao abrigo do novo Acordo Ortográfico.}}
 
 \begin{thebibliography}{9}
-\bibitem{Thomas}Thomas H. Cormen, Charles E. Leiserson, Ronald L. Rivest, \emph{Introduction to algorithms Third Edition}, Cambridge, MA [etc.] : The MIT Press, cop. 2009.
+\bibitem{lamport93}
+  Andrew S. Tanenbaum,
+  David J. Wetherall,
+  \emph{Computer Networks},
+  Prentice Hall, 
+  5th edition,
+  2011.
 \end{thebibliography}
 
 \end{document}
+
