@@ -13,7 +13,7 @@
 \usepackage{hyperref}
 \usepackage{float}
 
-\title{\huge \textbf{Protocolo de Ligação de Dados\\[1cm] \Large Relatório intercalar\\[0.7cm]
+\title{\huge \textbf{Protocolo de Ligação de Dados\\[1cm] \Large Relatório\\[0.7cm]
 \includegraphics{res/logo.png}\\[0.7cm] \large Redes de Computadores\\[0.25cm] \small $3^o$ ano\\[0.05cm]Mestrado Integrado em Engenharia Informática e
 Computação\\[1cm]}\normalsize Turma 4}
 
@@ -43,15 +43,90 @@ Computação\\[1cm]}\normalsize Turma 4}
 \section{Protocolo de aplicação}
 \iffalse (identificação dos principais aspectos funcionais; descrição da estratégia de implementação destes aspectos com apresentação de extractos de código) \fi
 
+A camada de aplicação é responsável pela leitura/escrita dos dados do ficheiro a enviar/receber. Do lado do emissor, procede-se à segmentação do ficheiro em pacotes de dados que vão sendo numerados e enviados para a camada de ligação de dados, por forma a serem encaixados em tramas de informação e posteriormente enviados através da porta de série. Do lado do receptor, é feita a compilação e escritura dos dados recebidos num ficheiro em disco nomeado de acordo com a informação recebida nos pacotes de controlo. Quer no emissor quer no receptor, recorre-se à codificação das etapas sob a forma de máquinas de estado.
+
+\subsection{Envio de um ficheiro}
+A camada de aplicação pode interpretar os argumentos opcionais passados através da interface de linha de comandos para ler do disco um ficheiro para uma estrutura de dados que armazena os dados, o nome e o tamanho do ficheiro. Opcionalmente, só os dados de um ficheiro serão lidos do \texttt{stdin} para a estrutura de dados referida e será atribuido um nome de ficheiro predefinido.
+
+\begin{verbatim}
+struct file {
+    const char* name;
+    size_t size;
+    char* data;
+};
+\end{verbatim}
+
+Após a leitura do ficheiro, a camada de aplicação entra numa máquina de estados com quatro estados ordenados: abertura de ligação, envio de pacote de controlo inicial, envio de pacotes de dados, envio de pacote de controlo final e fecho da ligação.
+
+\subsubsection*{Método usado na abertura de ligação}
+
+\begin{verbatim}
+int llopen(char *port, int transmitter);
+\end{verbatim}
+
+\subsubsection*{Método usado para o envio de pacotes de controlo inicial e final}
+\begin{verbatim}
+int send_control_packet(struct connection* connection, struct file *file,
+        byte control_field);
+\end{verbatim}
+
+\subsubsection*{Método usado para o envio de pacote de dados}
+\begin{verbatim}
+int send_data_packets(struct connection* connection, struct file* file,
+        size_t* num_data_bytes_sent, size_t* sequence_number);
+\end{verbatim}
+
+\subsubsection*{Método usado para o envio dos pacotes para a camada de ligação de dados}
+\begin{verbatim}
+int transmitter_write(struct connection* conn, byte* data_packet, size_t size);
+\end{verbatim}
+
+\subsubsection*{Método usado no fecho da ligação}
+\begin{verbatim}
+int llclose(const int fd);
+\end{verbatim}
+
+\subsection{Receção de um ficheiro}
+
 \section{Validação}
 \iffalse (descrição dos testes efectuados com apresentação quantificada dos resultados, se possível) \fi
 
 \section{Elementos de valorização}
 \iffalse (identificação dos elementos de valorização implementados; descrição da estratégia de implementação com apresentação de pequenos extratos de código) \fi
 
+\subsection{Selecção de parâmetros pelo utilizador}
+Quando o programa é invocado pela linha de comandos de forma errónea ou sem quaisquer parâmetros adicionais, são mostrados os argumentos opcionais disponíveis que permitem configurar a execução do programa, nomeadamente o modo de operação (\texttt{receiver} ou \texttt{transmitter}), leitura do ficheiro a enviar do disco ou proveniente de dados redirecionados do \texttt{stdin}, selecção da baudrate, determinação do tamanho máximo de bytes de dados enviados em cada frame e do número de tentativas na recuperação de erros. 
+
+\subsection{Implementação de REJ}
+Quando ocorrem erros no processamento de tramas recebidas na camada de ligação de dados, é enviada de forma preemptiva ao \texttt{timeout} uma trama com confimação negativa (\texttt{REJ}) que permite a retransmissão da trama de informação.
+
+\begin{verbatim}
+else if (ret == BADFRAME_CODE) {
+    /*
+    * Send 'bad frame' acknowledgment.
+    */
+    byte c_out = data_reply_byte(conn->frame_number, FALSE);
+    if (f_send_frame(conn->fd, FRAME(c_out)) != SUCCESS_CODE)
+        break;
+}
+\end{verbatim}
+
+\subsection{Verificação da integridade dos dados pela Aplicação}
+Após receção com sucesso do primeiro pacote de controlo pela camada de aplicação, é armazenado o tamanho expectável em bytes do ficheiro a receber, comparando-o no fim da sessão com o valor real de bytes dados recebidos. São também guardados os números de pacotes de dados perdidos e duplicados.
+
+\begin{verbatim}
+void receiver_stats()
+{
+    fprintf(stdout, "Receiver statistics\n");
+    fprintf(stdout, "\treceived file bytes/file bytes:%zu/%zu\n",
+            received_file_bytes, real_file_bytes);
+    fprintf(stdout, "\tlost packets:%zu\n", lost_packets);
+    fprintf(stdout, "\tduplicated packets:%zu\n", duplicated_packets);
+}
+\end{verbatim}
+
 \section{Conclusões}
 \iffalse (síntese da informação apresentada nas secções anteriores; reflexão sobre os objectivos de aprendizagem alcançados) \fi
-
 
 \begin{thebibliography}{9}
 \bibitem{lamport93}
