@@ -11,7 +11,22 @@
 \usepackage{hyphenat}
 \usepackage{url}
 \usepackage{hyperref}
+\usepackage{listings}
 \usepackage{float}
+\usepackage[usenames,dvipsnames,svgnames,table]{xcolor}
+
+\lstdefinestyle{customc}{
+  belowcaptionskip=1\baselineskip,
+  breaklines=true,
+  xleftmargin=\parindent,
+  language=C,
+  showstringspaces=false,
+  basicstyle=\footnotesize\ttfamily,
+  keywordstyle=\bfseries\color{blue},
+  commentstyle=\itshape\color{gray},
+  identifierstyle=\color{black},
+  stringstyle=\color{OliveGreen},
+}
 
 \title{\huge \textbf{Protocolo de Ligação de Dados\\[1cm] \Large Relatório\\[0.7cm]
 \includegraphics{res/logo.png}\\[0.7cm] \large Redes de Computadores\\[0.25cm] \small $3^o$ ano\\[0.05cm]Mestrado Integrado em Engenharia Informática e
@@ -22,20 +37,39 @@ Computação\\[1cm]}\normalsize Turma 4}
 \begin{document}
 \maketitle
 
+\newpage
+\tableofcontents
+\newpage
+
 \abstract
-(dois parágrafos: um sobre o contexto do trabalho; outro sobre as principais conclusões do relatório)
+\iffalse dois parágrafos: um sobre o contexto do trabalho; outro sobre as principais conclusões do relatório \fi
+
+No âmbito da unidade curricular de Redes de Computadores, foi-nos proposto o desenvolvimento de uma aplicação que testasse um protocolo de ligação de dados criado, transferindo um ficheiro recorrendo à porta de série $RS-232$. O trabalho permitiu praticar conceitos teóricos no desenho de um protocolo de ligação de dados como o sincronismo e delimitação de tramas, controlo de erros, controlo de fluxo recurso a mecanismos de transparência de dados na transmissão assíncrona.
+
+Findo o projeto, notou-se a importância dos mecanismos que asseguram tolerância a falhas fornecidos pela camada de ligação de dados, uma vez que a camada física não é realmente fiável.
 
 \section{Introdução}
-\iffalse(indicação dos objectivos do trabalho e do relatório; descrição da lógica do relatório com indicações sobre o tipo de informação que poderá ser encontrada em cada uma secções seguintes)\fi
+\iffalse(indicação dos objectivos do trabalho e do relatório; descrição da lógica do relatório com indicações sobre o tipo de informação que poderá ser encontrada em cada uma secções seguintes) \fi
 
 \section{Arquitetura}
-\iffalse (blocos funcionais e interfaces)\fi
+\iffalse (blocos funcionais e interfaces) \fi
 
 \section{Estrutura do código}
 \iffalse (APIs, principais estruturas de dados, principais funções e sua relação com a arquitetura) \fi
 
 \section{Casos de uso principais}
 \iffalse (identificação; sequências de chamada de funções) \fi
+A utilização do programa divide-se em dois propósitos distintos: envio ou receção de um ficheiro. A fase de tratamento dos parâmetros opcionais passados pela linha de comandos é comum em ambos os casos e engloba a chamada de funções como: \texttt{parse\_args}, \texttt{parse\_serial\_port\_arg}, \texttt{parse\_flags} e chamadas opcionais a outras funções consoante os parâmetros passados. 
+
+\subsection*{Envio de ficheiro}
+Após a interpretação dos parâmetros opcionais e a leitura do ficheiro, o programa invoca a função \texttt{send\_file} da camada de aplicação para o envio de um ficheiro que por sua vez pede à camada de ligação de dados que estabeleça uma ligação pela porta de série na chamada à função \texttt{transmitter\_connect} e transmita dados através da função \texttt{transmitter\_write} e termine a ligação com a chamada \texttt{disconnect}.
+
+A chamada \texttt{transmitter\_connect} da camada da ligação de dados abre a porta de série envia a trama SET e recebe a trama UA. No envio de tramas que requerem confimação de receção é usada a função \texttt{f\_send\_acknowledged\_frame}. Antes da chamada à função \texttt{transmitter\_write}, o programa organiza a informação a enviar sob a forma de pacotes de dados nas funções \texttt{send\_control\_packet} ou \texttt{send\_data\_packets}.
+
+\subsection*{Receção de ficheiro}
+Após a interpretação dos parâmetros opcionais e a leitura do ficheiro, o programa invoca a função \texttt{receive\_file} da camada de aplicação para a receção de um ficheiro que por sua vez pede à camada de ligação de dados que estabeleça uma ligação pela porta de série com a chamada à função \texttt{receiver\_listen} e receba pacotes de dados através da função \texttt{receiver\_read} e termine a ligação com a chamada \texttt{disconnect}.
+
+A chamada \texttt{receiver\_listen} da camada da ligação de dados abre a porta de série e espera pela receção de uma trama SET enviando em seguida a confirmação de receção com a função \texttt{f\_send\_frame}. Na camada de ligação de dados é usada a função \texttt{f\_receive\_frame} na receção de tramas. Após a receção de um pacote de dados através da função \texttt{llread}, o programa descodifica os dados recebidos nas funções \texttt{parse\_control\_packet} ou \texttt{parse\_data\_packet} caso se espere receber um pacote de controlo ou de dados respectivamente.
 
 \section{Protocolo de ligação lógica}
 \iffalse (identificação dos principais aspectos funcionais; descrição da estratégia de implementação destes aspectos com apresentação de extratos de código) \fi
@@ -48,45 +82,80 @@ A camada de aplicação é responsável pela leitura/escrita dos dados do fichei
 \subsection{Envio de um ficheiro}
 A camada de aplicação pode interpretar os argumentos opcionais passados através da interface de linha de comandos para ler do disco um ficheiro para uma estrutura de dados que armazena os dados, o nome e o tamanho do ficheiro. Opcionalmente, só os dados de um ficheiro serão lidos do \texttt{stdin} para a estrutura de dados referida e será atribuido um nome de ficheiro predefinido.
 
-\begin{verbatim}
+\begin{lstlisting}[style=customc]
 struct file {
     const char* name;
     size_t size;
     char* data;
 };
-\end{verbatim}
+\end{lstlisting}
 
 Após a leitura do ficheiro, a camada de aplicação entra numa máquina de estados com quatro estados ordenados: abertura de ligação, envio de pacote de controlo inicial, envio de pacotes de dados, envio de pacote de controlo final e fecho da ligação.
 
 \subsubsection*{Método usado na abertura de ligação}
 
-\begin{verbatim}
+\begin{lstlisting}[style=customc]
 int llopen(char *port, int transmitter);
-\end{verbatim}
+\end{lstlisting}
 
 \subsubsection*{Método usado para o envio de pacotes de controlo inicial e final}
-\begin{verbatim}
+\begin{lstlisting}[style=customc]
 int send_control_packet(struct connection* connection, struct file *file,
         byte control_field);
-\end{verbatim}
+\end{lstlisting}
 
 \subsubsection*{Método usado para o envio de pacote de dados}
-\begin{verbatim}
+\begin{lstlisting}[style=customc]
 int send_data_packets(struct connection* connection, struct file* file,
         size_t* num_data_bytes_sent, size_t* sequence_number);
-\end{verbatim}
+\end{lstlisting}
 
 \subsubsection*{Método usado para o envio dos pacotes para a camada de ligação de dados}
-\begin{verbatim}
+\begin{lstlisting}[style=customc]
 int transmitter_write(struct connection* conn, byte* data_packet, size_t size);
-\end{verbatim}
+\end{lstlisting}
 
 \subsubsection*{Método usado no fecho da ligação}
-\begin{verbatim}
+\begin{lstlisting}[style=customc]
 int llclose(const int fd);
-\end{verbatim}
+\end{lstlisting}
 
 \subsection{Receção de um ficheiro}
+
+Após a interpretação dos parâmetros passados pela linha de comandos que indicam ao programa para receber um ficheiro, a camada de aplicação entra numa máquina de estados com quatro estados ordenados: abertura de ligação, receção de pacote de controlo inicial, receção de pacotes de dados e fecho da ligação. Após o estabelecimento de uma ligação com sucesso, o programa fica à espera da receção de um pacote de controlo com os dados relativos ao tamanho e nome do ficheiro. Posteriormente, inicia-se o processo de receção dos pacotes de dados com a informação contida no ficheiro até que se receba um pacote de controlo final, sinalizando o fim da receção do ficheiro.
+
+\subsubsection*{Método usado para receber o pacote de controlo inicial}
+\begin{lstlisting}[style=customc]
+int receive_start_control_packet(const int fd,
+		char **file_name, size_t *file_size)
+\end{lstlisting}
+
+\subsubsection*{Método usado para descodificar um pacote de controlo}
+\begin{lstlisting}[style=customc]
+int parse_control_packet(const int control_packet_length,
+		byte *control_packet, char **file_name,
+		size_t *file_size)
+\end{lstlisting}
+
+\subsubsection*{Método usado para receber pacotes de dados e escrever em disco}
+\begin{lstlisting}[style=customc]
+int receive_data_packets(const int fd, char* file_name, 
+		size_t file_size, int attempts_left)
+\end{lstlisting}
+
+\subsubsection*{Método usado para descodificar um pacote pacote de dados}
+\begin{lstlisting}[style=customc]
+int parse_data_packet(const int data_packet_length,
+		byte *data_packet, char **data,
+		size_t* sequence_number)
+\end{lstlisting}
+
+\subsubsection*{Método usado para descodificar um pacote pacote de dados}
+\begin{lstlisting}[style=customc]
+int parse_data_packet(const int data_packet_length,
+		byte *data_packet, char **data,
+		size_t* sequence_number)
+\end{lstlisting}
 
 \section{Validação}
 \iffalse (descrição dos testes efectuados com apresentação quantificada dos resultados, se possível) \fi
@@ -100,21 +169,21 @@ Quando o programa é invocado pela linha de comandos de forma errónea ou sem qu
 \subsection{Implementação de REJ}
 Quando ocorrem erros no processamento de tramas recebidas na camada de ligação de dados, é enviada de forma preemptiva ao \texttt{timeout} uma trama com confimação negativa (\texttt{REJ}) que permite a retransmissão da trama de informação.
 
-\begin{verbatim}
+\begin{lstlisting}[style=customc]
 else if (ret == BADFRAME_CODE) {
-    /*
-    * Send 'bad frame' acknowledgment.
-    */
-    byte c_out = data_reply_byte(conn->frame_number, FALSE);
-    if (f_send_frame(conn->fd, FRAME(c_out)) != SUCCESS_CODE)
-        break;
+	/*
+	* Send 'bad frame' acknowledgment.
+	*/
+	byte c_out = data_reply_byte(conn->frame_number, FALSE);
+	if (f_send_frame(conn->fd, FRAME(c_out)) != SUCCESS_CODE)
+		break;
 }
-\end{verbatim}
+\end{lstlisting}
 
 \subsection{Verificação da integridade dos dados pela Aplicação}
 Após receção com sucesso do primeiro pacote de controlo pela camada de aplicação, é armazenado o tamanho expectável em bytes do ficheiro a receber, comparando-o no fim da sessão com o valor real de bytes dados recebidos. São também guardados os números de pacotes de dados perdidos e duplicados.
 
-\begin{verbatim}
+\begin{lstlisting}[style=customc]
 void receiver_stats()
 {
     fprintf(stdout, "Receiver statistics\n");
@@ -123,7 +192,7 @@ void receiver_stats()
     fprintf(stdout, "\tlost packets:%zu\n", lost_packets);
     fprintf(stdout, "\tduplicated packets:%zu\n", duplicated_packets);
 }
-\end{verbatim}
+\end{lstlisting}
 
 \section{Conclusões}
 \iffalse (síntese da informação apresentada nas secções anteriores; reflexão sobre os objectivos de aprendizagem alcançados) \fi
