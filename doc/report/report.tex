@@ -61,7 +61,7 @@ Computação\\[1cm]}\normalsize Turma 4}
 \abstract
 \iffalse dois parágrafos: um sobre o contexto do trabalho; outro sobre as principais conclusões do relatório \fi
 
-No âmbito da unidade curricular de Redes de Computadores, foi-nos proposto o desenvolvimento de uma aplicação que testasse um protocolo de ligação de dados criado, transferindo um ficheiro recorrendo à porta de série $RS-232$. O trabalho permitiu praticar conceitos teóricos no desenho de um protocolo de ligação de dados como o sincronismo e delimitação de tramas, controlo de erros, controlo de fluxo recurso a mecanismos de transparência de dados na transmissão assíncrona.
+No âmbito da unidade curricular de Redes de Computadores, foi-nos proposto o desenvolvimento de uma aplicação que testasse um protocolo de ligação de dados criado de raiz, transferindo um ficheiro recorrendo à porta de série $RS-232$. O trabalho permitiu praticar conceitos teóricos no desenho de um protocolo de ligação de dados como o sincronismo e delimitação de tramas, controlo de erros, controlo de fluxo recurso a mecanismos de transparência de dados na transmissão assíncrona.
 
 Findo o projeto, notou-se a importância dos mecanismos que asseguram tolerância a falhas fornecidos pela camada de ligação de dados, uma vez que a camada física não é realmente fiável.
 
@@ -73,7 +73,7 @@ Este relatório pretende explicar o projeto final descrevendo a sua estrutura e 
 
 \section{Arquitetura}
 \iffalse (blocos funcionais e interfaces) \fi
-O projeto está organizado em duas camadas principais: a camada de aplicação e a camada de ligação de dados. As camadas respeitam o princípio de independência uma vez que cada uma apenas se responsabiliza/conhece um tipo de tarefa específica, no caso da camada de aplicação, de mais alto nível, lida com a interação de ficheiros e pacotes de dados e no caso da ligação de dados são feitas as tarefas de mais baixo nível relacionadas com o processamento de tramas e a interação com a porta de série.
+O projeto está organizado em duas camadas principais: a camada de aplicação e a camada de ligação de dados. As camadas respeitam o princípio de independência uma vez que cada uma apenas se responsabiliza/conhece um tipo de tarefa específica, no caso da camada de aplicação, de mais alto nível, lida-se com a interação de ficheiros e pacotes de dados e no caso da ligação de dados são feitas as tarefas de mais baixo nível relacionadas com o processamento de tramas e a interação com a porta de série.
 
 A camada de aplicação está implementada nos ficheiros \texttt{netlink.c}, \texttt{file.c} e \texttt{packets.c}.
 
@@ -95,6 +95,116 @@ A chamada \texttt{receiver\_listen} da camada da ligação de dados abre a porta
 
 \section{Protocolo de ligação lógica}
 \iffalse (identificação dos principais aspectos funcionais; descrição da estratégia de implementação destes aspectos com apresentação de extratos de código) \fi
+A camada de ligação lógica é responsável pelo envio de informação através da porta de série. Para tal, uma série de mecanismos são necessários para assegurar a transmissão com sucesso dos dados. Os dados são encapsulados em tramas com numeração e a delimitação das tramas é feita por uma sequêncial especial de oito bits.
+É também assegurada a transparência dos dados pela técnica de byte stuffing.
+
+A proteção da integridade dos dados é feita  pelo uso de um código detetor de erros, no caso das tramas S e U pelo $BCC1$ e nas tramas I existe um segundo código, o $BCC2$, que verifica a integridade do campo de dados.
+
+\subsection*{Delimitação e envio de uma trama}
+
+\begin{lstlisting}[style=customc]
+Return_e f_send_frame(const int fd, const struct frame frame)
+{
+	byte *bp = g_buffer;
+
+	*bp++ = FLAG;
+
+	// write header
+	*bp++ = frame.address;
+	*bp++ = frame.control;
+	*bp++ = frame.address ^ frame.control; // bcc
+
+	// copy data
+	if (frame.size > LL_MAX_PAYLOAD_UNSTUFFED) {
+		return ERROR_CODE;
+
+	} else if (frame.size > 0) { // frame might be 0 if it is supervision
+		bp = copy_and_stuff_bytes(bp, frame.data, frame.size);
+	}
+
+	*bp++ = FLAG;
+
+	if (serial_port_write(fd, g_buffer, bp - g_buffer) < 0) {
+		return ERROR_CODE;
+	}
+	++g_sent_frame_counter;
+
+	return SUCCESS_CODE;
+}
+\end{lstlisting}
+
+\subsection*{Verificação da integridade uma trama recebida}
+\begin{lstlisting}[style=customc]
+static Return_e parse_frame_from_array(struct frame* frame, byte *a)
+{
+	if (*a++ != FLAG) {
+		return ERROR_CODE;
+	}
+	for (int i = 0; i <= 2; i++) { // the next fields should not have a FLAG
+		if (a[i] == FLAG) {
+			return BADFRAME_CODE;
+		}
+	}
+
+	frame->address = *a++;
+	frame->control = *a++;
+	const byte header_bcc = *a++;
+	if (header_bcc != (frame->address ^ frame->control)) {
+		++g_header_bcc_error_counter;
+		return BADFRAME_CODE;
+	}
+	frame->size = 0;
+
+	/* Supervision frame */
+	if (*a == FLAG) {
+		return SUCCESS_CODE;
+	}
+
+	if (*(a + 1) == FLAG) {
+		return BADFRAME_CODE;
+	}
+
+	/* Data frame */
+	byte data_bcc = 0;
+	size_t num_bytes = 0;
+	while (1) {
+		if (num_bytes > LL_MAX_PAYLOAD_STUFFED) {
+			return BADFRAME_CODE;
+		}
+		if (frame->size > frame->max_data_size) {
+			return BADFRAME_CODE;
+		}
+
+		byte c;
+		if (a[num_bytes] == BS_ESC) {
+			fprintf(stderr, "----\n");
+			// remove byte stuffing
+			++num_bytes;
+			c = BS_OCT ^ a[num_bytes];
+		} else {
+			c = a[num_bytes];
+		}
+        ++num_bytes;
+        frame->data[frame->size++] = c;
+        fprintf(stderr, "%x\n", c);
+
+		/*
+		 * Stop loop condition.
+		 */
+		if (a[num_bytes] == FLAG) {
+			if (frame->data[frame->size-1] != data_bcc) {
+				++g_data_bcc_error_counter;
+				return BADFRAME_CODE;
+			}
+			return SUCCESS_CODE;
+		} else {
+            data_bcc ^= c;
+            fprintf(stderr,"c = %x, bcc = %x\n",c,data_bcc);
+        }
+
+	}
+}
+\end{lstlisting}
 
 \section{Protocolo de aplicação}
 \iffalse (identificação dos principais aspectos funcionais; descrição da estratégia de implementação destes aspectos com apresentação de extractos de código) \fi
@@ -102,7 +212,7 @@ A chamada \texttt{receiver\_listen} da camada da ligação de dados abre a porta
 A camada de aplicação é responsável pela leitura/escrita dos dados do ficheiro a enviar/receber. Do lado do emissor, procede-se à segmentação do ficheiro em pacotes de dados que vão sendo numerados e enviados para a camada de ligação de dados, por forma a serem encaixados em tramas de informação e posteriormente enviados através da porta de série. Do lado do receptor, é feita a compilação e escritura dos dados recebidos num ficheiro em disco nomeado de acordo com a informação recebida nos pacotes de controlo. Quer no emissor quer no receptor, recorre-se à codificação das etapas sob a forma de máquinas de estado.
 
 \subsection{Envio de um ficheiro}
-A camada de aplicação pode interpretar os argumentos opcionais passados através da interface de linha de comandos para ler do disco um ficheiro para uma estrutura de dados que armazena os dados, o nome e o tamanho do ficheiro. Opcionalmente, só os dados de um ficheiro serão lidos do \texttt{stdin} para a estrutura de dados referida e será atribuido um nome de ficheiro predefinido.
+A camada de aplicação pode interpretar os argumentos opcionais passados através da interface de linha de comandos para ler do disco um ficheiro para uma estrutura de dados que armazena os dados, o nome e o tamanho do ficheiro. Opcionalmente, só os dados de um ficheiro serão lidos do \texttt{stdin} para a estrutura de dados referida e será atribuído um nome de ficheiro predefinido.
 
 \begin{lstlisting}[style=customc]
 struct file {
@@ -181,6 +291,9 @@ int parse_data_packet(const int data_packet_length,
 
 \section{Validação}
 \iffalse (descrição dos testes efectuados com apresentação quantificada dos resultados, se possível) \fi
+O projeto inclui testes unicamente a camada de ligação de dados nos ficheiros \texttt{data\_link\_test.c} e \texttt{serial\_port\_test}. No caso da porta de série, são feitos pequenos testes com a validação dos outputs dado um determinado input numa chamada directa das funções read e write à camada lógica. 
+
+No caso da ligação de dados é feito um teste ao nível do sistema de tramas incluíndo os códigos de verificação de integridade e byte stuffing.
 
 \section{Elementos de valorização}
 \iffalse (identificação dos elementos de valorização implementados; descrição da estratégia de implementação com apresentação de pequenos extratos de código) \fi
@@ -189,7 +302,7 @@ int parse_data_packet(const int data_packet_length,
 Quando o programa é invocado pela linha de comandos de forma errónea ou sem quaisquer parâmetros adicionais, são mostrados os argumentos opcionais disponíveis que permitem configurar a execução do programa, nomeadamente o modo de operação (\texttt{receiver} ou \texttt{transmitter}), leitura do ficheiro a enviar do disco ou proveniente de dados redirecionados do \texttt{stdin}, selecção da baudrate, determinação do tamanho máximo de bytes de dados enviados em cada frame e do número de tentativas na recuperação de erros. 
 
 \subsection{Implementação de REJ}
-Quando ocorrem erros no processamento de tramas recebidas na camada de ligação de dados, é enviada de forma preemptiva ao \texttt{timeout} uma trama com confimação negativa (\texttt{REJ}) que permite a retransmissão da trama de informação.
+Quando ocorrem erros no processamento de tramas recebidas na camada de ligação de dados, é enviada de forma preemptiva ao \texttt{timeout} uma trama com confirmação negativa (\texttt{REJ}) que permite a retransmissão da trama de informação.
 
 \begin{lstlisting}[style=customc]
 else if (ret == BADFRAME_CODE) {
@@ -219,7 +332,7 @@ void receiver_stats()
 \section{Conclusões}
 \iffalse (síntese da informação apresentada nas secções anteriores; reflexão sobre os objectivos de aprendizagem alcançados) \fi
 
-O projeto pode ser sumariamente descrito pelo seu principal propósito que é o desenvolvimento de um protocolo de ligação de dados e seu teste pelo sucesso na transferência de ficheiros entre dois computadores. 
+O projeto pode ser sumariamente descrito pelo seu principal propósito que é o desenvolvimento de um protocolo de ligação de dados e o seu teste pelo sucesso na transferência de ficheiros entre dois computadores. 
 
 \begin{thebibliography}{9}
 \bibitem{lamport93}
@@ -1167,6 +1280,8 @@ void retry(int* attempt)
 }
 \end{lstlisting}
 
+
+\subsection{Camada de ligação de dados}
 \subsubsection*{serial\_port.c}
 \begin{lstlisting}[style=customcwithlines]
 #include <sys/types.h>
@@ -1748,7 +1863,7 @@ void f_dump_frame_buffer(const char *filename)
  * - checks if its a supervision or data frame
  * - checks bcc 
  * - destuffs bytes
- * - returns SUCCESS_CODE, ERROR_CODE, or BADFRAME_CODE (when bcc is wrong, or
+netlink.c * - returns SUCCESS_CODE, ERROR_CODE, or BADFRAME_CODE (when bcc is wrong, or
  *   data is too large)
  */
 static Return_e parse_frame_from_array(struct frame* frame, byte *a)
@@ -2068,6 +2183,670 @@ int f_send_acknowledged_frame(const int fd, const unsigned num_retransmissions,
 	}
 
 	return ntries;
+}
+\end{lstlisting}
+
+\subsection{Ficheiros com funções de validação}
+\subsubsection*{data\_link\_test.c}
+\begin{lstlisting}[style=customcwithlines]
+#include "data_link_codes.h"
+#include "data_link_io.h"
+#include "data_link.h"
+#include "serial_port.h"
+#include <stdio.h>
+#include <string.h>
+#include <assert.h>
+#include <unistd.h>
+#include <termios.h> // Baudrate
+#define DEVICE "/dev/ttyS0"
+
+int TRANSMITTER = 0;
+
+struct connection CONNECTION = { .max_buffer_size = LL_MAX_PAYLOAD_STUFFED,
+		.num_retransmissions = 3, .baudrate = B300, .timeout_s = 3,
+		.micro_timeout_ds = 11, .close_wait_time = 3 };
+
+int are_frames_equal(struct frame f1, struct frame f2)
+{
+	if (f1.address != f2.address) {
+		fprintf(stderr, "are_frames_equal(): %d\n", __LINE__);
+		return 0;
+	}
+	if (f1.control != f2.control) {
+		fprintf(stderr, "are_frames_equal(): %d\n", __LINE__);
+		return 0;
+	}
+	if (f1.size != f2.size) {
+		fprintf(stderr, "are_frames_equal(): %d\n", __LINE__);
+		return 0;
+	}
+	for (size_t i = 0; i < f1.size; i++) {
+		if (f1.data[i] != f2.data[i]) {
+			fprintf(stderr, "are_frames_equal(): %d\n", __LINE__);
+			return 0;
+		}
+	}
+	return 1;
+}
+
+// Print how the arguments must be
+void help(char **argv)
+{
+	printf("Usage: %s [OPTION] <serial port>\n", argv[0]);
+	printf("\n Program options:\n");
+	printf("  -t         transmit data over the serial port\n");
+}
+
+// Verifies serial port argument
+int parse_serial_port_arg(int index, char **argv)
+{
+	char *dev = argv[index];
+	if ((strcmp("/dev/ttyS0", dev) != 0) && (strcmp("/dev/ttyS1", dev) != 0)
+			&& (strcmp("/dev/ttyS4", dev) != 0)) {
+		return -3;
+	}
+	return index;
+}
+
+// Verifies arguments
+int parse_args(int argc, char **argv)
+{
+	if (argc < 2)
+		return -1;
+
+	if (argc == 2)
+		return parse_serial_port_arg(1, argv);
+
+	if (argc == 3) {
+		if ((strcmp("-t", argv[1]) != 0))
+			return -2;
+		else
+			TRANSMITTER = 1;
+
+		return parse_serial_port_arg(2, argv);
+	} else
+		return -1;
+}
+
+int test_1(struct connection* conn)
+{
+	if (TRANSMITTER) {
+		f_print_frame(SET);
+		if (f_send_frame(conn->fd, SET) != SUCCESS_CODE) {
+			f_dump_frame_buffer("FRAME");
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+
+	} else {
+
+		struct frame frame;
+		Return_e ret = f_receive_frame(conn->fd, &frame, 0);
+		f_print_frame(frame);
+		f_print_frame(SET);
+		f_dump_frame_buffer("FRAME");
+
+		if (ret != SUCCESS_CODE) {
+			printf("ret: %d\n", (int) ret);
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+		if (!are_frames_equal(frame, SET)) {
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+int test_2(struct connection* conn)
+{
+	if (TRANSMITTER) {
+		sleep(1);
+
+		f_print_frame(SET);
+		struct frame reply;
+		if (0 > f_send_acknowledged_frame(conn->fd, 1, 10, SET, &reply)) {
+			printf("line: %d\n", __LINE__);
+			return -1;
+		}
+		if (reply.control != C_UA) {
+			f_dump_frame_buffer("FRAME");
+			printf("line: %d\n", __LINE__);
+			return -1;
+		}
+	} else {
+		struct frame reply;
+		Return_e ret = f_receive_frame(conn->fd, &reply, 30);
+		if (ret == ERROR_CODE) {
+			fprintf(stderr, "ret = %d\n", ret);
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+		if (reply.control == C_SET) {
+			f_send_frame(conn->fd, UA);
+		}
+	}
+	return 0;
+}
+
+int test_3(struct connection* conn)
+{
+	int test_timeout_time = 3;
+
+	if (TRANSMITTER) {
+		f_print_frame(SET);
+		f_dump_frame_buffer("FRAME");
+		struct frame reply;
+		if (0
+				> f_send_acknowledged_frame(conn->fd, 3, test_timeout_time, SET,
+						&reply)) {
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+		if (reply.control != C_UA) {
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+	} else {
+		printf("Sleeping for %d seconds...", test_timeout_time + 1);
+		sleep(test_timeout_time + 1); // force timeout
+
+		struct frame reply;
+		Return_e ret;
+
+		ret = f_receive_frame(conn->fd, &reply, 3);
+		if (ret == ERROR_CODE) {
+			fprintf(stderr, "ret = %d\n", ret);
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+		ret = f_receive_frame(conn->fd, &reply, 3);
+		if (ret == ERROR_CODE) {
+			fprintf(stderr, "ret = %d\n", ret);
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+		if (reply.control == C_SET) {
+			f_send_frame(conn->fd, UA);
+		}
+	}
+	return 0;
+}
+
+int test_4(struct connection *conn)
+{
+	if (TRANSMITTER) {
+		if (transmitter_connect(conn) < 0) {
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+		printf("Connection established.\n");
+		if (disconnect(conn) < 0) {
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+	} else {
+		if (receiver_listen(conn) < 0) {
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+		if (wait_for_disconnect(conn, 0) < 0) {
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+int test_single_message(struct connection *conn, byte* data)
+{
+	if (TRANSMITTER) {
+		if (transmitter_connect(conn) < 0) {
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+
+		byte* s = data;
+		if (transmitter_write(conn, s, strlen((char*) s) + 1) < 0) {
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+		printf("--- Transmitted: %s\n", (char*) s);
+
+		if (disconnect(conn) < 0) {
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+	} else {
+		if (receiver_listen(conn) < 0) {
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+
+		byte dest[8000];
+
+		if (receiver_read(conn, dest, 8000, 0) < 0) {
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+		printf("--- Received: %s\n", (char*) dest);
+		if (strcmp((char*) dest, (char*) data) != 0) {
+			printf("%s\n", (char*) dest);
+			printf("%s\n", (char*) data);
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+int test_5(struct connection* conn)
+{
+	char *data = "isto e um teste";
+	return test_single_message(conn, (byte*) data);
+}
+
+int test_6(struct connection* conn)
+{
+	char data[] = "Flag: x, Escape: x";
+	data[6] = FLAG;
+	data[17] = BS_ESC;
+	return test_single_message(conn, (byte*) data);
+}
+
+int send_message(struct connection* conn, byte* s)
+{
+	int len = strlen((char*) s);
+	if (len == 0) {
+		len = 1;
+	}
+	if (transmitter_write(conn, s, len) < 0) {
+		printf("line: %d\n", __LINE__);
+		return 1;
+	}
+	printf("--- Transmitted: %s\n", (char*) s);
+	return 0;
+}
+
+int test_7(struct connection* conn)
+{
+	char data1[] = "isto ";
+	char data2[] = "e ";
+	char data3[] = "um ";
+	char data4[] = "teste ";
+	char data5[] = "com ";
+	char data6[] = "varias ";
+	char data7[] = "tramas.";
+	char data8[] = "";
+	char final_string[] = "isto e um teste com varias tramas.";
+
+	printf("data1 = %s\n", data1);
+
+	if (TRANSMITTER) {
+		if (transmitter_connect(conn) < 0) {
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+		send_message(conn, (byte*) data1);
+		send_message(conn, (byte*) data2);
+		send_message(conn, (byte*) data3);
+		send_message(conn, (byte*) data4);
+		send_message(conn, (byte*) data5);
+		send_message(conn, (byte*) data6);
+		send_message(conn, (byte*) data7);
+		send_message(conn, (byte*) data8);
+
+		if (disconnect(conn) < 0) {
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+	} else {
+		if (receiver_listen(conn) < 0) {
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+
+		byte dest[8000];
+
+		if (receiver_read(conn, dest, 8000, 0) < 0) {
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+		printf("--- Received: %s\n", (char*) dest);
+		if (strcmp((char*) dest, final_string) != 0) {
+			printf("%s\n", (char*) dest);
+			printf("%s\n", final_string);
+			printf("line: %d\n", __LINE__);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+int main(int argc, char *argv[])
+{
+	int i;
+	if ((i = parse_args(argc, argv)) < 0) {
+		help(argv);
+		printf("line: %d\n", __LINE__);
+		return 1;
+	}
+
+	struct connection conn = CONNECTION;
+
+	strcpy(conn.port, argv[i]);
+
+	if ((conn.fd = serial_port_open(conn.port, conn.micro_timeout_ds)) < 0) {
+		printf("line: %d\n", __LINE__);
+		return 1;
+	}
+	assert(test_1(&conn) == 0);
+	printf(" ------------ Passed test 1\n");
+	assert(test_2(&conn) == 0);
+	printf(" ------------ Passed test 2\n");
+	assert(test_3(&conn) == 0);
+	printf(" ------------ Passed test 3\n");
+	if (serial_port_close(conn.fd, 3) < 0) {
+		printf("line: %d\n", __LINE__);
+		return 1;
+	}
+
+	assert(test_4(&conn) == 0);
+	printf(" ------------ Passed test 4\n");
+	assert(test_5(&conn) == 0);
+	printf(" ------------ Passed test 5\n");
+	assert(test_6(&conn) == 0);
+	printf(" ------------ Passed test 6\n");
+	assert(test_7(&conn) == 0);
+	printf(" ------------ Passed test 7\n");
+	printf("Finished\n");
+	return 0;
+}
+\end{lstlisting}
+
+\subsubsection*{serial\_port\_test.c}
+\begin{lstlisting}[style=customcwithlines]
+#include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <assert.h>
+
+#include "serial_port.h"
+#include "data_link.h"
+#include "byte.h"
+
+#define FALSE 0
+#define TRUE 1
+
+#define BUFSIZE 4096
+
+int is_transmitter = FALSE;
+
+// Print how the arguments must be
+void help(char **argv)
+{
+	printf("Usage: %s [OPTION] <serial port>\n", argv[0]);
+	printf("\n Program options:\n");
+	printf("  -t         transmit data over the serial port\n");
+}
+
+// Verifies serial port argument
+int parse_serial_port_arg(int index, char **argv)
+{
+    char *dev = argv[index];
+	if ( (strcmp("/dev/ttyS0", dev)!= 0) &&
+		(strcmp("/dev/ttyS1", dev)!=0) && 
+		(strcmp("/dev/ttyS4", dev)!=0) ) {
+		return -3;
+    }
+	return index;
+} 
+
+// Verifies arguments
+int parse_args(int argc, char **argv)
+{
+	if (argc < 2)
+		return -1;
+		
+	if (argc == 2)
+		return parse_serial_port_arg(1, argv);
+		
+	if (argc == 3) {
+		if ( (strcmp("-t", argv[1]) != 0) )
+			return -2;
+		else is_transmitter = TRUE;
+		
+		return parse_serial_port_arg(2, argv);
+	}
+	else return -1;
+}
+
+int send_receive_test(char* port,byte* test_message)
+{
+    int timeout = 0;
+    int fd = serial_port_open(port,timeout);
+    if (fd < 0) {
+        fprintf(stderr,"serial_port_test: serial_port_open returned %d\n",fd);
+        printf("line: %d\n",__LINE__);
+        return 1;
+    }
+
+    byte s[BUFSIZE];
+    if (is_transmitter) {
+        int len = strlen((char*)test_message);
+        if (serial_port_write(fd,(byte*)test_message,len+1) < 0) {
+            printf("line: %d\n",__LINE__);
+            return 1;
+        }
+        printf("len = %d\n",len);
+        //printf("Message sent: %s\n",s);
+
+        byte s[BUFSIZE];
+        for (int i=0; i < BUFSIZE; i++) {
+            s[i] = 1;
+        }
+        int r = serial_port_read(fd,s,'\0',BUFSIZE);
+        if (r <= 0) {
+            printf("r = %d\n",r);
+            printf("line: %d\n",__LINE__);
+            return 1;
+        }
+        //printf("Message received: %s\n",s);
+
+	if (strcmp((char*)test_message,(char*)s) != 0) {
+        printf("r = %d\n",r);
+		printf("Test failed\n");
+        /*
+        for (int i = 0; test_message[i] != '\0'; ++i) {
+            if (test_message[i] != s[i]) {
+                printf("test_message %x\n",test_message[i]);
+                printf("s %x\n",s[i]);
+            }
+        }
+        */
+		return -1;
+	}
+
+    } else {
+        if (serial_port_read(fd,s,'\0',BUFSIZE) < 0) {
+            printf("line: %d\n",__LINE__);
+            return 1;
+        }
+        //printf("Message received: %s\n",s);
+
+        int len = strlen((char*)s);
+        if (serial_port_write(fd,s,len+1) < 0) {
+            printf("line: %d\n",__LINE__);
+            return 1;
+        }
+        //printf("Message sent: %s\n",(char*)s);
+    }
+
+    if (serial_port_close(fd,3) < 0) {
+        fprintf(stderr,"serial_port_test: serial_port_close returned \
+                negative\n");
+        printf("line: %d\n",__LINE__);
+        return 1;
+    }
+    return 0;
+}
+
+
+int test1(int argc,char **argv)
+{
+     // Verifies arguments
+     int i = -1;
+     if ( (i = parse_args(argc, argv)) < 0 ) {
+     	help(argv);
+             printf("line: %d\n",__LINE__);
+     	return 1;
+     }
+
+    if (send_receive_test(argv[i],(byte*)"Um pequeno passo para o homem...") == 0) {
+        printf("Test 1 passed\n");
+    }
+    return 0;
+}
+
+int get_frame(byte *dest,byte *src,byte flag)
+{
+    for (int i = 0; i < BUFSIZE; i++) {
+        if (src[i] == flag) {
+            dest[i] = '\0';
+            return i;
+        }
+        dest[i] = src[i];
+    }
+    return -1;
+}
+
+int test2(int argc,char **argv)
+{
+    // Verifies arguments
+    int i = -1;
+    if ((i = parse_args(argc, argv)) < 0 ) {
+        help(argv);
+        printf("line: %d\n",__LINE__);
+       return 1;
+    }
+	
+    int timeout = 0;
+    int fd = serial_port_open(argv[i],timeout);
+    if (fd < 0) {
+        fprintf(stderr,"serial_port_test: serial_port_open returned %d\n",fd);
+        printf("line: %d\n",__LINE__);
+        return 1;
+    }
+
+
+    if (is_transmitter) {
+        byte *test_string = (byte*) "   F0001FF0002F0003F0004F  ";
+
+        int len = strlen((char*)test_string);
+        if (serial_port_write(fd,test_string,len+1) < 0) {
+            printf("line: %d\n",__LINE__);
+            return 1;
+        }
+    } else {
+        // Read until first flag
+        byte tmp[BUFSIZE];
+        for (int i = 0; i < BUFSIZE; i++) { // init
+            tmp[i] = 'x';
+        }
+        if (serial_port_read(fd,tmp,'F',BUFSIZE) < 0) {
+            printf("line: %d\n",__LINE__);
+            return 1;
+        }
+
+        byte dest[BUFSIZE];
+        for (int i = 0; i < BUFSIZE; i++) { // init
+            dest[i] = 'x';
+        }
+
+        byte *frames[] = 
+        { (byte*)"0001", (byte*)"0002", (byte*)"0003", (byte*)"0004" };
+
+        // Read a few frames
+        for (int i = 0; i < 4; i++) {
+            // Read a frame
+            if (serial_port_read(fd,tmp,'F',BUFSIZE) < 0) {
+                printf("line: %d\n",__LINE__);
+                return 1;
+            }
+
+            byte plb = serial_port_previous_last_byte();
+            printf("previous last byte: %c\n",plb);
+            if (plb != 'F') {
+                printf("line: %d\n",__LINE__);
+                return 1;
+            }
+
+            int size = get_frame(dest,tmp,'F');
+            if (size < 0) {
+                printf("line: %d\n",__LINE__);
+                return 1;
+            } else if (size == 0) {
+                // Space in between 'F's
+                --i;
+            } else {
+                printf("frame %d: %s\n",i,(char*)dest);
+                if (strcmp((char*)dest,(char*)frames[i]) != 0) {
+                    printf("line: %d\n",__LINE__);
+                    return 1;
+                }
+            }
+        }
+    }
+
+    if (serial_port_close(fd,3) < 0) {
+        fprintf(stderr,"serial_port_test: serial_port_close returned \
+                negative\n");
+        return 1;
+    }
+
+    printf("Test 2 passed\n");
+    return 0;
+}
+
+int test3(int argc,char **argv)
+{
+    // Verifies arguments
+    int i = -1;
+    if ( (i = parse_args(argc, argv)) < 0 ) {
+        help(argv);
+        printf("line: %d\n",__LINE__);
+        return 1;
+    }
+
+    byte message[256];
+    for (int j = 0; j < 256; ++j) {
+	    message[j] = j+1;
+    }
+    message[255] = '\0';
+    //message[0] = 100;
+    //message[1] = 101;
+    //message[2] = 0;
+
+    if (send_receive_test(argv[i],message) == 0) {
+        printf("Test 3 passed\n");
+    }
+    return 0;
+}
+
+int main(int argc, char **argv)
+{
+    //printf("Test 1...\n");
+    //assert(test1(argc,argv) == 0);
+
+    //printf("Test 2...\n");
+    //assert(test2(argc,argv) == 0);
+
+    printf("Test 3...\n");
+    assert(test3(argc,argv) == 0);
+	return 0;
 }
 \end{lstlisting}
 
