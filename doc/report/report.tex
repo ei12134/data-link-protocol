@@ -95,13 +95,12 @@ A chamada \texttt{receiver\_listen} da camada da ligação de dados abre a porta
 
 \section{Protocolo de ligação lógica}
 \iffalse (identificação dos principais aspectos funcionais; descrição da estratégia de implementação destes aspectos com apresentação de extratos de código) \fi
-A camada de ligação lógica é responsável pelo envio de informação através da porta de série. Para tal, uma série de mecanismos são necessários para assegurar a transmissão com sucesso dos dados. Os dados são encapsulados em tramas com numeração e a delimitação das tramas é feita por uma sequêncial especial de oito bits.
+A camada de ligação lógica é responsável pela organização e controlo do envio e receção de informação através da ligação lógica, neste caso a porta de série $RS-232$. Para tal, uma série de mecanismos são necessários para assegurar a transmissão com sucesso dos dados. Os dados são encapsulados em tramas com numeração e a delimitação das tramas é feita por uma sequêncial especial de oito bits.
 É também assegurada a transparência dos dados pela técnica de byte stuffing.
 
 A proteção da integridade dos dados é feita  pelo uso de um código detetor de erros, no caso das tramas S e U pelo $BCC1$ e nas tramas I existe um segundo código, o $BCC2$, que verifica a integridade do campo de dados.
 
 \subsection*{Delimitação e envio de uma trama}
-
 \begin{lstlisting}[style=customc]
 Return_e f_send_frame(const int fd, const struct frame frame)
 {
@@ -291,9 +290,9 @@ int parse_data_packet(const int data_packet_length,
 
 \section{Validação}
 \iffalse (descrição dos testes efectuados com apresentação quantificada dos resultados, se possível) \fi
-O projeto inclui testes unicamente a camada de ligação de dados nos ficheiros \texttt{data\_link\_test.c} e \texttt{serial\_port\_test}. No caso da porta de série, são feitos pequenos testes com a validação dos outputs dado um determinado input numa chamada directa das funções read e write à camada lógica. 
+O projeto inclui testes apenas à camada de ligação de dados nos ficheiros \texttt{data\_link\_test.c} e \texttt{serial\_port\_test.c}. No caso da porta de série, são feitos testes simples que validam os outputs dado um determinado input numa chamada directa das funções \texttt{read} e \texttt{write} da camada lógica.
 
-No caso da ligação de dados é feito um teste ao nível do sistema de tramas incluíndo os códigos de verificação de integridade e byte stuffing.
+No caso da ligação de dados é feito um teste ao nível do sistema de tramas incluíndo os códigos de verificação de integridade e o sistema de \emph{byte stuffing}.
 
 \section{Elementos de valorização}
 \iffalse (identificação dos elementos de valorização implementados; descrição da estratégia de implementação com apresentação de pequenos extratos de código) \fi
@@ -332,7 +331,9 @@ void receiver_stats()
 \section{Conclusões}
 \iffalse (síntese da informação apresentada nas secções anteriores; reflexão sobre os objectivos de aprendizagem alcançados) \fi
 
-O projeto pode ser sumariamente descrito pelo seu principal propósito que é o desenvolvimento de um protocolo de ligação de dados e o seu teste pelo sucesso na transferência de ficheiros entre dois computadores. 
+O projeto pode ser sumariamente descrito pelo seu principal propósito que é o desenvolvimento de um protocolo de ligação de dados e o seu teste aquando da obtenção de sucesso na transferência de ficheiros entre dois computadores, com mecanismos de recuperação face a algumas situações de erros. 
+
+Findo o projeto, consideramos que atingimos os objetivos definidos tendo também implementado alguns dos elementos de valorização especificados no guião. Esta abordagem prática permitiu também uma melhor consciência do funcionamento e dos problemas inerentes às redes comunicações entre computadores, abordados nas aulas teóricas.
 
 \begin{thebibliography}{9}
 \bibitem{lamport93}
